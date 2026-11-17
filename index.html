@@ -144,6 +144,14 @@
           font-size:14px; cursor:pointer; }
   .empty { padding:40px 20px; color:var(--muted); text-align:center; }
   .updated { color:var(--muted); font-size:10.5px; text-align:center; padding:14px; }
+  .scroll { max-height:260px; overflow-y:auto; }
+  .heat { width:100%; border-collapse:collapse; font-size:11.5px;
+          font-variant-numeric:tabular-nums; }
+  .heat th, .heat td { border:1px solid var(--border); padding:4px 6px; text-align:center; }
+  .heat th { color:var(--muted); font-weight:600; font-size:10px; }
+  .heat td b { color:var(--accent); }
+  .heat td.low b { color:var(--green); } .heat td.hi b { color:var(--yellow); }
+  .heat td.na { color:var(--muted); }
   /* пароль-гейт */
   #gate { position:fixed; inset:0; background:var(--bg); z-index:50;
           display:flex; flex-direction:column; align-items:center;
@@ -219,12 +227,15 @@
     <div class="atabpane" data-pane="overview">
       <div class="ana-note">Пересчитывается под активные фильтры</div>
       <div class="atile" id="anaTiles"></div>
-      <div class="asec"><h4>Топ арендаторов</h4><div id="anaTenants"></div></div>
+      <div class="atile" id="anaTiles2" style="margin-top:8px"></div>
+      <div class="asec"><h4>Полнота данных по источникам</h4><div id="aComp2"></div></div>
+      <div class="asec"><h4>Топ-15 арендаторов</h4><div class="scroll" id="anaTenants"></div></div>
+      <div class="asec"><h4>Все арендаторы</h4><div class="scroll" id="aTenAll2"></div></div>
       <div class="asec"><h4>Ценовые сегменты</h4><div id="anaPrice"></div></div>
       <div class="asec"><h4>Источники</h4><div id="anaSrc"></div></div>
     </div>
     <div class="atabpane" data-pane="market">
-      <div class="ana-note">Рынок целиком за последние 14 дней</div>
+      <div class="ana-note">Рынок целиком за последние 30 дней</div>
       <div class="asec"><h4>Новые объекты по дням</h4>
         <div class="days" id="mktDays"></div>
         <div class="flow">
@@ -234,17 +245,24 @@
         </div>
       </div>
       <div class="asec"><h4>Свежесть активных объявлений</h4><div id="mktFresh"></div></div>
+      <div class="asec"><h4>Публикации за 7 дней по источникам</h4><div id="aSrcNew2"></div></div>
+      <div class="asec"><h4>Залежавшиеся: экспозиция ≥14 дней</h4><div class="scroll" id="aStale2"></div></div>
     </div>
     <div class="atabpane" data-pane="geo">
       <div class="ana-note">Клик по строке — фильтр этой станции или города</div>
-      <div class="asec"><h4>Топ-10 станций метро</h4><div id="geoMetro"></div></div>
-      <div class="asec"><h4>Города (Москва и МО)</h4><div id="geoCity"></div></div>
+      <div class="asec"><h4>Топ-20 станций метро</h4><div class="scroll" id="geoMetro"></div></div>
+      <div class="asec"><h4>Станции с высокой доходностью (≥3 объекта)</h4><div id="aMetroYield2"></div></div>
+      <div class="asec"><h4>Города (Москва и МО)</h4><div class="scroll" id="geoCity"></div></div>
     </div>
     <div class="atabpane" data-pane="prices">
       <div class="ana-note">История цен из базы (за 14 дней)</div>
       <div class="asec"><h4>Самые упавшие в цене</h4><div id="prDrops"></div></div>
+      <div class="asec"><h4>Подорожавшие</h4><div id="aRises2"></div></div>
       <div class="asec"><h4>Медианная ₽/м² по размеру</h4><div id="prSize"></div></div>
       <div class="asec"><h4>Сегмент цены → медианная доходность</h4><div id="prMatrix"></div></div>
+      <div class="asec"><h4>Тепловая матрица: площадь × цена</h4><div id="aHeat2"></div></div>
+      <div class="asec"><h4>Выбросы ₽/м² (−30% от медианы)</h4><div id="aOut2"></div></div>
+      <div class="asec"><h4>Расхождение заявка/расчёт</h4><div id="aGap2"></div></div>
     </div>
     <div class="atabpane" data-pane="dups">
       <div class="ana-note">Один объект у разных брокеров — разница цен как аргумент торга</div>
@@ -380,10 +398,17 @@ function renderOverview(rows) {
     [portfolio ? fmtBig(portfolio) : "—", "стоимость выборки"],
     [medPb ? medPb.toFixed(1) + " лет" : "—", "медианная окупаемость"],
   ].map(([v,t]) => `<div><b>${v}</b><span>${t}</span></div>`).join("");
+  document.getElementById("anaTiles2").innerHTML = [
+    [act.length, "объектов в выборке"],
+    [act.filter(r => r.anchor_tenant).length, "якорных"],
+    [new Set(act.filter(r => r.tenant).map(r => r.tenant)).size, "сетей/брендов"],
+    [act.filter(r => r.rent_derived).length, "аренда расчётная"],
+  ].map(([v,t]) => `<div><b>${v}</b><span>${t}</span></div>`).join("");
 
   const tmap = {};
   act.forEach(r => { if (r.tenant) tmap[r.tenant] = (tmap[r.tenant]||0)+1; });
-  const top = Object.entries(tmap).sort((a,b) => b[1]-a[1]).slice(0, 5);
+  const tAll = Object.entries(tmap).sort((a,b) => b[1]-a[1]);
+  const top = tAll.slice(0, 15);
   const tmax = top.length ? top[0][1] : 1;
   document.getElementById("anaTenants").innerHTML = top.length
     ? top.map(([name, n]) =>
@@ -392,12 +417,34 @@ function renderOverview(rows) {
            <div class="bar m"><i style="width:${Math.round(n/tmax*100)}%"></i><span>${n}</span></div>
          </div>`).join("")
       : `<div class="hint">В выборке нет объектов с указанным арендатором</div>`;
-  document.querySelectorAll("#anaTenants .trow").forEach(el =>
+  document.getElementById("aTenAll2").innerHTML = tAll.length
+    ? tAll.map(([name, n]) =>
+        `<div class="trow act" data-t="${esc(name)}">
+           <div class="name">${esc(name)}</div>
+           <div class="bar"><i style="width:${Math.round(n/tAll[0][1]*100)}%"></i><span>${n}</span></div>
+         </div>`).join("")
+      : `<div class="hint">—</div>`;
+  document.querySelectorAll("#anaTenants .trow, #aTenAll2 .trow").forEach(el =>
     el.addEventListener("click", () => {
       state.tenant = el.dataset.t;
       document.getElementById("fTenant").value = state.tenant;
       refresh(true);
     }));
+
+  // полнота данных по источникам
+  const smap0 = {};
+  act.forEach(r => { (smap0[r.source] = smap0[r.source]||[]).push(r); });
+  document.getElementById("aComp2").innerHTML = Object.entries(smap0)
+    .sort((a,b) => b[1].length - a[1].length).map(([s, arr]) => {
+      const n = arr.length;
+      const p = f => Math.round(arr.filter(f).length / n * 100);
+      return `<div class="trow"><div class="name" style="white-space:normal">
+         <b style="color:var(--accent)">${esc(s)}</b> (${n} шт)
+         <div class="hint">цена ${p(r => r.price)}% · площадь ${p(r => r.area)}% · аренда ${p(r => r.rent_month)}% · ` +
+         `метро ${p(r => r.metro)}% · арендатор ${p(r => r.tenant || r.has_tenant)}%</div>
+       </div></div>`;
+    }).join("") +
+    `<div class="hint">«—» в карточках — поле не публикуется источником</div>`;
 
   const segs = [["до 20 млн", r => r.price && r.price < 20e6],
                 ["20–50 млн", r => r.price && r.price >= 20e6 && r.price < 50e6],
@@ -430,10 +477,10 @@ function renderOverview(rows) {
 // ---------- Рынок ----------
 function renderMarket() {
   const act = DATA.listings.filter(r => r.status === "active");
-  // 14 дней по дням (МСК)
+  // 30 дней по дням (МСК)
   const today = new Date(Date.now() + MSK_H*3600e3);
   const counts = [];
-  for (let i = 13; i >= 0; i--) {
+  for (let i = 29; i >= 0; i--) {
     const d = new Date(today.getTime() - i*864e5);
     const day = d.toISOString().slice(0,10);
     counts.push([day, act.filter(r => mskDay(r.first_seen) === day).length]);
@@ -441,7 +488,7 @@ function renderMarket() {
   const dmax = Math.max(1, ...counts.map(c => c[1]));
   document.getElementById("mktDays").innerHTML = counts.map(([day, n], i) =>
     `<div><div class="v">${n}</div><div class="b" style="height:${Math.max(4, Math.round(n/dmax*58))}px"></div>
-     <div class="lb">${i % 3 === 0 || i === 13 ? day.slice(8,10) + "." + day.slice(5,7) : ""}</div></div>`).join("");
+     <div class="lb">${i % 5 === 0 ? day.slice(8,10) + "." + day.slice(5,7) : ""}</div></div>`).join("");
 
   const in7 = iso => iso && (Date.now() - new Date(iso).getTime()) <= 7*864e5;
   const new7 = act.filter(r => in7(r.first_seen)).length;
@@ -453,6 +500,31 @@ function renderMarket() {
   const netEl = document.getElementById("mktNet");
   netEl.textContent = (net >= 0 ? "+" : "−") + Math.abs(net);
   netEl.style.color = net > 0 ? "var(--green)" : (net < 0 ? "var(--red)" : "var(--text)");
+
+  // публикации за 7 дней по источникам
+  const snmap = {};
+  act.filter(r => in7(r.first_seen)).forEach(r => { snmap[r.source] = (snmap[r.source]||0)+1; });
+  const snew = Object.entries(snmap).sort((a,b) => b[1]-a[1]);
+  const snmax = Math.max(1, ...snew.map(s => s[1]));
+  document.getElementById("aSrcNew2").innerHTML = snew.length
+    ? snew.map(([s, n]) =>
+        `<div class="trow"><div class="name">${esc(s)}</div>
+           <div class="bar"><i style="width:${Math.round(n/snmax*100)}%"></i><span>${n}</span></div></div>`).join("")
+      : `<div class="hint">За 7 дней публикаций не было</div>`;
+
+  // залежавшиеся
+  const stale = act.filter(r => r.first_seen &&
+    (Date.now() - new Date(r.first_seen).getTime()) >= 14*864e5)
+    .sort((a,b) => (a.first_seen||"").localeCompare(b.first_seen||"")).slice(0, 10);
+  document.getElementById("aStale2").innerHTML = stale.length
+    ? stale.map(r => {
+        const days = Math.round((Date.now() - new Date(r.first_seen).getTime()) / 864e5);
+        return `<div class="trow"><div class="name" style="white-space:normal">
+           <a href="${esc(r.url || "#")}" target="_blank" style="color:var(--accent);text-decoration:none">${esc((r.address || r.title || "").slice(0, 42))}</a>
+           <div class="hint">${days} дней на рынке · ${fmtM(r.price)} · ${r.source}${r.yield_pct ? " · " + r.yield_pct.toFixed(1) + "%" : ""}</div>
+         </div></div>`;
+      }).join("")
+      : `<div class="hint">Объектов с экспозицией ≥14 дней пока нет</div>`;
 
   // свежесть
   const buckets = [["Сегодня (24 ч)", 86400e3], ["1–3 дня", 3*86400e3],
@@ -481,7 +553,7 @@ function renderGeo() {
     const st = r.metro.split(",")[0].trim();
     if (st) mmap[st] = (mmap[st]||0)+1;
   });
-  const metro = Object.entries(mmap).sort((a,b) => b[1]-a[1]).slice(0, 10);
+  const metro = Object.entries(mmap).sort((a,b) => b[1]-a[1]).slice(0, 20);
   const mmax = Math.max(1, ...metro.map(m => m[1]));
   document.getElementById("geoMetro").innerHTML = metro.length
     ? metro.map(([s, n]) =>
@@ -506,7 +578,7 @@ function renderGeo() {
   });
   const cities = Object.entries(cmap).map(([c, v]) =>
     ({ c, n: v.n, y: median(v.ys), ppm: median(v.ppm) }))
-    .sort((a,b) => b.n - a.n).slice(0, 12);
+    .sort((a,b) => b.n - a.n).slice(0, 20);
   const cmax = Math.max(1, ...cities.map(c => c.n));
   document.getElementById("geoCity").innerHTML = cities.map(v =>
     `<div class="trow act" data-q="${esc(v.c)}">
@@ -519,6 +591,25 @@ function renderGeo() {
       document.getElementById("q").value = state.q;
       refresh(true);
     }));
+
+  // станции с высокой доходностью (≥3 объекта)
+  const m2y = {};
+  act.forEach(r => {
+    if (!r.metro || r.yield_pct == null) return;
+    const st = r.metro.split(",")[0].trim();
+    if (!st) return;
+    (m2y[st] = m2y[st] || { ys: [], n: 0 }).ys.push(r.yield_pct);
+    m2y[st].n += 1;
+  });
+  const mYield = Object.entries(m2y)
+    .filter(([s, v]) => v.n >= 3)
+    .map(([s, v]) => ({ s, med: median(v.ys), n: v.n }))
+    .sort((a, b) => b.med - a.med).slice(0, 10);
+  document.getElementById("aMetroYield2").innerHTML = mYield.length
+    ? mYield.map(v =>
+        `<div class="trow"><div class="name">${esc(v.s)}</div>
+           <div class="cnt">${v.med.toFixed(1)}% <span style="color:var(--muted);font-size:10px">(${v.n} шт)</span></div></div>`).join("")
+      : `<div class="hint">Нет станций с ≥3 объектами и доходностью</div>`;
 }
 
 // ---------- Цены ----------
@@ -566,6 +657,82 @@ function renderPrices() {
      </div>`;
   }).join("") +
   `<div class="hint">Медианная доходность сегмента — в какой цене рынок платит больше</div>`;
+
+  // подорожавшие
+  const riseList = ch.filter(c => c.pct > 0).sort((a,b) => b.pct - a.pct).slice(0, 3);
+  const avgDrop = drops.length ? drops.reduce((a, c) => a + c.pct, 0) / drops.length : null;
+  document.getElementById("aRises2").innerHTML =
+    (avgDrop != null ? `<div class="hint">Средняя дельта падений: ${avgDrop.toFixed(1)}%</div>` : "") +
+    (riseList.length
+      ? riseList.map(c =>
+          `<div class="drop"><div class="a" style="color:var(--green)">${esc((c.address || "объект").slice(0, 45))}</div>
+           <div class="p" style="color:var(--green)">${fmtM(c.old_price)} → ${fmtM(c.new_price)} (+${c.pct.toFixed(1)}%)</div>
+           <div class="d">${msk(c.ts)} МСК</div></div>`).join("")
+      : "");
+
+  // тепловая матрица площадь × цена
+  const aB = [[0, 50], [50, 100], [100, 200], [200, Infinity]];
+  const pB = [[0, 20e6], [20e6, 50e6], [50e6, 100e6], [100e6, Infinity]];
+  const aL = ["до 50", "50–100", "100–200", "200+ м²"];
+  const pL = ["до 20", "20–50", "50–100", "100+ млн"];
+  const allMed = median(act.filter(r => r.yield_pct).map(r => r.yield_pct));
+  let heat = `<table class="heat"><tr><th>площадь \\ цена</th>${pL.map(l => `<th>${l}</th>`).join("")}</tr>`;
+  for (let ai = 0; ai < 4; ai++) {
+    heat += `<tr><th>${aL[ai]}</th>`;
+    for (let pi = 0; pi < 4; pi++) {
+      const ys = act.filter(r => r.area != null && r.area >= aB[ai][0] &&
+        (aB[ai][1] === Infinity || r.area < aB[ai][1]) &&
+        r.price != null && r.price >= pB[pi][0] &&
+        (pB[pi][1] === Infinity || r.price < pB[pi][1]) && r.yield_pct)
+        .map(r => r.yield_pct);
+      const med = median(ys);
+      if (med == null) { heat += `<td class="na">—</td>`; continue; }
+      const cls = allMed && med > allMed * 1.1 ? "low" :
+                  (allMed && med < allMed * 0.9 ? "hi" : "");
+      heat += `<td class="${cls}" title="${ys.length} шт"><b>${med.toFixed(1)}%</b><br><span class="src">${ys.length} шт</span></td>`;
+    }
+    heat += "</tr>";
+  }
+  heat += `</table><div class="hint">Зелёное — доходность выше средней на 10%+ · жёлтое — ниже</div>`;
+  document.getElementById("aHeat2").innerHTML = heat;
+
+  // выбросы ₽/м²
+  const segMed = {};
+  for (const [t, a, b] of segs) {
+    segMed[t] = median(act.filter(r => r.price >= a && (b === Infinity || r.price < b) && r.price_per_m2)
+                       .map(r => r.price_per_m2));
+  }
+  const outliers = act.filter(r => {
+    if (!r.price_per_m2) return false;
+    for (const [t, a, b] of segs) {
+      if (r.price >= a && (b === Infinity || r.price < b) && segMed[t])
+        return r.price_per_m2 < segMed[t] * 0.7;
+    }
+    return false;
+  }).sort((a,b) => (a.price_per_m2||0) - (b.price_per_m2||0)).slice(0, 8);
+  document.getElementById("aOut2").innerHTML = outliers.length
+    ? outliers.map(r => {
+        let med = null;
+        for (const [t, a, b] of segs) {
+          if (r.price >= a && (b === Infinity || r.price < b)) { med = segMed[t]; break; }
+        }
+        return `<div class="trow"><div class="name" style="white-space:normal">
+           <a href="${esc(r.url || "#")}" target="_blank" style="color:var(--accent);text-decoration:none">${esc((r.address || r.title || "").slice(0, 48))}</a>
+           <div class="hint">${fmtM(r.price)} · ${r.area || "—"} м² · ${fmt(r.price_per_m2)} ₽/м² (медиана сегмента ${fmt(med || 0)} ₽) · ${r.yield_pct ? r.yield_pct.toFixed(1) + "%" : "—"}</div>
+         </div></div>`;
+      }).join("")
+      : `<div class="hint">Выбросов не найдено</div>`;
+
+  // расхождения заявка/расчёт (глобально)
+  const gapRows = DATA.listings.filter(r => r.yield_gap_pp != null && Math.abs(r.yield_gap_pp) > 1)
+    .sort((a,b) => Math.abs(b.yield_gap_pp) - Math.abs(a.yield_gap_pp)).slice(0, 8);
+  document.getElementById("aGap2").innerHTML = gapRows.length
+    ? gapRows.map(r =>
+        `<div class="trow"><div class="name" style="white-space:normal">
+           <a href="${esc(r.url || "#")}" target="_blank" style="color:var(--accent);text-decoration:none">${esc((r.address || r.title || "").slice(0, 45))}</a>
+           <div class="hint">заявлено ${r.seller_yield_pct?.toFixed(1) ?? "—"}% · расчёт ${(r.yield_pct || 0).toFixed(1)}% · разница ${r.yield_gap_pp > 0 ? "+" : ""}${r.yield_gap_pp.toFixed(1)} п.п.</div>
+         </div></div>`).join("")
+      : `<div class="hint">Расхождений >1 п.п. нет</div>`;
 }
 
 // ---------- Дубли + концентрация ----------
@@ -588,7 +755,7 @@ function renderDups() {
                addr: (arr[0].address || arr[0].title || "").slice(0, 60),
                pct: lo ? Math.round(spread / lo * 100) : 0 };
     })
-    .sort((a,b) => b.spread - a.spread).slice(0, 6);
+    .sort((a,b) => b.spread - a.spread).slice(0, 10);
   document.getElementById("dupList").innerHTML = dups.length
     ? dups.map(d =>
         `<div class="trow act" data-g="${esc(d.g)}">
@@ -622,7 +789,11 @@ function renderDups() {
     `<div class="trow"><div class="name">${esc(t)}</div>
        <div class="bar ${cls}"><i style="width:${Math.round(n/total*100)}%"></i><span>${Math.round(n/total*100)}%</span></div>
      </div>`).join("") +
-    `<div class="hint">Топ-5 сетей занимают ${Math.round(top5n/total*100)}% всей базы (${top5n} из ${total})</div>`;
+    `<div class="hint">Топ-5 сетей занимают ${Math.round(top5n/total*100)}% всей базы (${top5n} из ${total}) · ` +
+    `HH-индекс арендаторов: ${(() => {
+      const w = withT.length || 1;
+      return Math.round(Object.values(tmap).reduce((a, n) => a + (n / w * 100) ** 2, 0));
+    })()} (шкала 0–10000)</div>`;
 }
 
 // ---------- карточки ----------
