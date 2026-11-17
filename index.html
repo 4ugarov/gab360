@@ -275,11 +275,12 @@ function renderAnalytics(rows) {
   const medPb = median(pbs);
 
   const fmtA = v => v >= 1000 ? (v/1000).toFixed(1) + " тыс. м²" : Math.round(v) + " м²";
+  const fmtBig = v => v >= 1e9 ? (v/1e9).toFixed(1) + " млрд ₽" : fmtM(v);
   document.getElementById("anaTiles").innerHTML = [
     [act.length ? fmtA(totalArea) : "—", "общая площадь"],
-    [avgPpm ? Math.round(avgPpm).toLocaleString("ru-RU") + " ₽" : "—",
-     "средняя ₽/м² (медиана " + (medPpm ? Math.round(medPpm).toLocaleString("ru-RU") : "—") + ")"],
-    [portfolio ? fmtM(portfolio) : "—", "стоимость выборки"],
+    [medPpm ? Math.round(medPpm).toLocaleString("ru-RU") + " ₽" : "—",
+     "медианная ₽/м²" + (avgPpm ? " · ср. " + Math.round(avgPpm).toLocaleString("ru-RU") : "")],
+    [portfolio ? fmtBig(portfolio) : "—", "стоимость выборки"],
     [medPb ? medPb.toFixed(1) + " лет" : "—", "медианная окупаемость"],
   ].map(([v,t]) => `<div><b>${v}</b><span>${t}</span></div>`).join("");
 
