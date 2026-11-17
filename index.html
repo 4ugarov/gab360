@@ -695,9 +695,9 @@ function renderPrices() {
   const aB = [[0, 50], [50, 100], [100, 200], [200, Infinity]];
   const pB = [[0, 20e6], [20e6, 50e6], [50e6, 100e6], [100e6, Infinity]];
   const aL = ["до 50", "50–100", "100–200", "200+ м²"];
-  const pL = ["до 20", "20–50", "50–100", "100+ млн"];
+  const pLHeat = ["до 20", "20–50", "50–100", "100+ млн"];
   const allMed = median(act.filter(r => r.yield_pct).map(r => r.yield_pct));
-  let heat = `<table class="heat"><tr><th>площадь \\ цена</th>${pL.map(l => `<th>${l}</th>`).join("")}</tr>`;
+  let heat = `<table class="heat"><tr><th>площадь \\ цена</th>${pLHeat.map(l => `<th>${l}</th>`).join("")}</tr>`;
   for (let ai = 0; ai < 4; ai++) {
     heat += `<tr><th>${aL[ai]}</th>`;
     for (let pi = 0; pi < 4; pi++) {
