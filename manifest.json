@@ -1,0 +1,19 @@
+{
+  "name": "ГАБ 360 — арендный бизнес Москва и МО",
+  "short_name": "ГАБ 360",
+  "description": "Мониторинг готового арендного бизнеса и стрит-ритейла в Москве и МО",
+  "lang": "ru",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f1720",
+  "theme_color": "#0f1720",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

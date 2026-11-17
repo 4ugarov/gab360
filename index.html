@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0f1720">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>ГАБ 360 — арендный бизнес Москва и МО</title>
+<style>
+  :root {
+    --bg:#0f1720; --panel:#182430; --panel2:#1f2d3d; --text:#dbe6f0;
+    --muted:#7d93a8; --accent:#3aa3ff; --green:#38c172; --yellow:#ffb833;
+    --red:#e05252; --border:#26374a;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:14px/1.45 -apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+         padding-bottom:env(safe-area-inset-bottom); }
+  header { padding:14px 14px 6px; position:sticky; top:0; background:var(--bg); z-index:5; }
+  h1 { margin:0; font-size:17px; font-weight:700; }
+  .sub { color:var(--muted); font-size:11px; }
+  .stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:10px 0; }
+  .stat { background:var(--panel); border:1px solid var(--border); border-radius:10px;
+          padding:8px 10px; }
+  .stat b { display:block; font-size:18px; color:var(--accent); }
+  .stat.g b { color:var(--green); } .stat.y b { color:var(--yellow); }
+  .stat span { color:var(--muted); font-size:10.5px; }
+  .search { width:100%; background:var(--panel2); border:1px solid var(--border);
+            border-radius:10px; color:var(--text); padding:10px 12px; font-size:14px;
+            outline:none; margin:4px 0; }
+  .chips { display:flex; gap:6px; overflow-x:auto; padding:2px 0 8px;
+           scrollbar-width:none; }
+  .chips::-webkit-scrollbar { display:none; }
+  .chip { flex:0 0 auto; border:1px solid var(--border); background:var(--panel2);
+          color:var(--muted); border-radius:20px; padding:6px 12px; font-size:12.5px;
+          cursor:pointer; user-select:none; }
+  .chip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .selrow { display:flex; gap:8px; padding-bottom:6px; }
+  .selrow select { flex:1; background:var(--panel2); border:1px solid var(--border);
+                   color:var(--text); border-radius:10px; padding:8px; font-size:12.5px;
+                   outline:none; }
+  .list { padding:0 14px 30px; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:12px;
+          padding:10px 12px; margin-bottom:10px; }
+  .card .top { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+  .addr { font-weight:600; font-size:14.5px; }
+  .src { color:var(--muted); font-size:10.5px; white-space:nowrap; }
+  .line2 { color:var(--muted); font-size:12px; margin-top:2px; }
+  .nums { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px;
+          font-variant-numeric:tabular-nums; }
+  .nums div { background:var(--panel2); border-radius:8px; padding:6px 8px; font-size:12px; }
+  .nums span { color:var(--muted); font-size:10px; display:block; }
+  .nums b { font-size:13px; font-weight:600; }
+  .y-hi { color:var(--green); } .y-lo { color:var(--yellow); }
+  .badges { margin-top:6px; display:flex; flex-wrap:wrap; gap:4px; }
+  .badge { border-radius:14px; padding:2px 8px; font-size:10.5px; font-weight:600; }
+  .b-new { background:rgba(56,193,114,.15); color:var(--green); }
+  .b-anc { background:rgba(58,163,255,.15); color:var(--accent); }
+  .b-rem { background:rgba(224,82,82,.15); color:var(--red); }
+  .b-dup { background:rgba(125,147,168,.15); color:var(--muted); }
+  .b-warn { background:rgba(255,184,51,.15); color:var(--yellow); }
+  .btn { display:block; text-align:center; margin-top:8px; background:var(--panel2);
+         color:var(--accent); border:1px solid var(--border); border-radius:10px;
+         padding:8px; font-size:13px; text-decoration:none; }
+  .more { display:block; width:100%; background:var(--panel2); color:var(--text);
+          border:1px solid var(--border); border-radius:10px; padding:12px;
+          font-size:14px; cursor:pointer; }
+  .empty { padding:40px 20px; color:var(--muted); text-align:center; }
+  .updated { color:var(--muted); font-size:10.5px; text-align:center; padding:14px; }
+  /* пароль-гейт */
+  #gate { position:fixed; inset:0; background:var(--bg); z-index:50;
+          display:flex; flex-direction:column; align-items:center;
+          justify-content:center; padding:24px; }
+  #gate h2 { font-size:18px; margin:0 0 4px; }
+  #gate p { color:var(--muted); font-size:12px; margin:0 0 16px; }
+  #gate input { width:100%; max-width:320px; background:var(--panel2);
+    border:1px solid var(--border); border-radius:10px; color:var(--text);
+    padding:12px; font-size:15px; outline:none; text-align:center; }
+  #gate button { width:100%; max-width:320px; margin-top:10px; background:var(--accent);
+    color:#fff; border:none; border-radius:10px; padding:12px; font-size:15px;
+    font-weight:600; cursor:pointer; }
+  #gate .err { color:var(--red); font-size:12px; margin-top:10px; min-height:16px; }
+  #gate.hide { display:none; }
+</style>
+</head>
+<body>
+<div id="gate">
+  <h2>🔒 ГАБ 360</h2>
+  <p>Данные зашифрованы. Введите пароль доступа.</p>
+  <input type="password" id="pw" autocomplete="current-password" inputmode="text">
+  <button id="go">Открыть</button>
+  <div class="err" id="gateErr"></div>
+</div>
+<header>
+  <h1>🏪 ГАБ 360</h1>
+  <div class="sub">Готовый арендный бизнес · Москва и МО · <span id="upd">—</span></div>
+</header>
+<div class="stats" id="stats"></div>
+<div style="padding:0 14px;">
+  <input class="search" id="q" placeholder="🔎 Адрес, арендатор, метро…">
+  <div class="chips" id="chips"></div>
+  <div class="selrow">
+    <select id="fSrc"><option value="">Источник: все</option></select>
+    <select id="fYield">
+      <option value="">Доходность: любая</option>
+      <option value="8">от 8%</option>
+      <option value="10">от 10%</option>
+      <option value="12">от 12%</option>
+      <option value="15">от 15%</option>
+    </select>
+  </div>
+</div>
+<div class="list" id="list"></div>
+<div style="padding:0 14px 20px;">
+  <button class="more" id="more" style="display:none">Показать ещё</button>
+</div>
+<div class="updated" id="foot"></div>
+
+<script>
+"use strict";
+const MSK_H = 3;
+const CHIPS = [
+  ["", "Все"], ["new", "🆕 Новые"], ["anchor", "⚓ Якорь"],
+  ["tenant", "С арендатором"], ["removed", "Снятые"]
+];
+let DATA = { listings: [], generated_at: "", new_cutoff: "" };
+let state = { chip: "", src: "", yMin: "", q: "" };
+let shown = 0;
+const PAGE = 30;
+
+const fmtM = v => v == null ? "—" : (v >= 1e6 ? (v/1e6).toFixed(v >= 3e7 ? 0 : 1) + " млн" :
+  Math.round(v).toLocaleString("ru-RU") + " ₽");
+const esc = s => (s == null ? "" : String(s)).replace(/[&<>"]/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const isNew = r => r.first_seen >= DATA.new_cutoff && r.status === "active";
+
+function msk(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return new Date(d.getTime() + MSK_H*3600e3).toISOString().slice(5,16).replace("T"," ");
+}
+
+function renderStats() {
+  const act = DATA.listings.filter(r => r.status === "active");
+  const ys = act.filter(r => r.yield_pct).map(r => r.yield_pct);
+  const avg = ys.length ? (ys.reduce((a,b)=>a+b)/ys.length).toFixed(1) : "—";
+  const boxes = [
+    ["", act.length, "в базе"],
+    ["g", act.filter(isNew).length, "новых"],
+    ["", act.filter(r => r.anchor_tenant).length, "якорных"],
+    ["y", avg + "%", "ср. доходность"],
+  ];
+  document.getElementById("stats").innerHTML = boxes.map(([c,v,t]) =>
+    `<div class="stat ${c}"><b>${v}</b><span>${t}</span></div>`).join("");
+  document.getElementById("upd").textContent = "обновлено " + msk(DATA.generated_at);
+}
+
+function filtered() {
+  const q = state.q.toLowerCase();
+  return DATA.listings.filter(r => {
+    if (state.chip === "new" && !isNew(r)) return false;
+    if (state.chip === "anchor" && !r.anchor_tenant) return false;
+    if (state.chip === "tenant" && !r.has_tenant) return false;
+    if (state.chip === "removed" && r.status !== "removed") return false;
+    if (state.chip !== "removed" && r.status !== "active") return false;
+    if (state.src && r.source !== state.src) return false;
+    if (state.yMin && (r.yield_pct == null || r.yield_pct < +state.yMin)) return false;
+    if (q && !((r.address||"")+" "+(r.title||"")+" "+(r.tenant||"")+" "+
+        (r.metro||"")).toLowerCase().includes(q)) return false;
+    return true;
+  }).sort((a,b) => (b.first_seen||"").localeCompare(a.first_seen||""));
+}
+
+function card(r) {
+  const price = fmtM(r.price);
+  const rent = r.rent_month ? Math.round(r.rent_month).toLocaleString("ru-RU") : "—";
+  const y = r.yield_pct != null ? r.yield_pct.toFixed(1)+"%" : "—";
+  const pb = r.payback_years ? r.payback_years.toFixed(1)+" лет" : "—";
+  const ycls = r.yield_pct >= 12 ? "y-hi" : (r.yield_pct && r.yield_pct < 9 ? "y-lo" : "");
+  const badges = [];
+  if (isNew(r)) badges.push(`<span class="badge b-new">NEW</span>`);
+  if (r.anchor_tenant) badges.push(`<span class="badge b-anc">⚓ ${esc(r.tenant||"якорь")}</span>`);
+  else if (r.tenant) badges.push(`<span class="badge b-anc" style="opacity:.7">${esc(r.tenant)}</span>`);
+  if (r.status === "removed") badges.push(`<span class="badge b-rem">снят</span>`);
+  if (r.rent_derived) badges.push(`<span class="badge b-warn">аренда расчётная</span>`);
+  if (r.yield_gap_pp != null && Math.abs(r.yield_gap_pp) > 1)
+    badges.push(`<span class="badge b-warn">расхождение ${r.yield_gap_pp>0?"+":""}${r.yield_gap_pp} п.п.</span>`);
+  return `<div class="card">
+    <div class="top"><div class="addr">${esc(r.address || r.title || "—")}</div>
+      <div class="src">${esc(r.source)} · ${esc((r.first_seen||"").slice(5,10))}</div></div>
+    <div class="line2">📍 ${esc(r.metro || "метро не указано")} · ${r.area || "—"} м²</div>
+    <div class="nums">
+      <div><span>Цена</span><b>${price}</b></div>
+      <div><span>Аренда/мес</span><b>${rent} ₽</b></div>
+      <div><span>Доходность</span><b class="${ycls}">${y}</b></div>
+      <div><span>Окупаемость</span><b>${pb}</b></div>
+    </div>
+    ${badges.length ? `<div class="badges">${badges.join("")}</div>` : ""}
+    ${r.url ? `<a class="btn" href="${esc(r.url)}" target="_blank" rel="noopener">Открыть объявление ↗</a>` : ""}
+  </div>`;
+}
+
+function renderList(reset) {
+  const rows = filtered();
+  const list = document.getElementById("list");
+  if (reset) { list.innerHTML = ""; shown = 0; }
+  if (!rows.length) {
+    list.innerHTML = `<div class="empty">Ничего не найдено — ослабьте фильтры</div>`;
+    document.getElementById("more").style.display = "none";
+    return;
+  }
+  const slice = rows.slice(shown, shown + PAGE);
+  list.insertAdjacentHTML("beforeend", slice.map(card).join(""));
+  shown += slice.length;
+  const more = document.getElementById("more");
+  more.style.display = shown < rows.length ? "block" : "none";
+  more.textContent = `Показать ещё (${shown} из ${rows.length})`;
+}
+
+function initChips() {
+  const box = document.getElementById("chips");
+  box.innerHTML = CHIPS.map(([v,t]) =>
+    `<div class="chip ${state.chip===v?"on":""}" data-v="${v}">${t}</div>`).join("");
+  box.querySelectorAll(".chip").forEach(ch => ch.addEventListener("click", () => {
+    state.chip = ch.dataset.v;
+    box.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", c === ch));
+    renderList(true);
+  }));
+}
+
+// ---------- расшифровка data.json.enc (AES-256-GCM + PBKDF2) ----------
+async function decryptPayload(blobText, password) {
+  const d = JSON.parse(blobText);
+  const enc = new TextEncoder();
+  const keyMat = await crypto.subtle.importKey(
+    "raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: b64buf(d.salt), iterations: d.iters, hash: "SHA-256" },
+    keyMat, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  const plain = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: b64buf(d.nonce) }, key, b64buf(d.ct));
+  return new TextDecoder().decode(plain);
+}
+const b64buf = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+
+async function load() {
+  const gateErr = document.getElementById("gateErr");
+  let pw = localStorage.getItem("gab360pw") || "";
+  let blob = null;
+
+  const res = await fetch("data.json.enc?v=" + Date.now());
+  blob = await res.text();
+
+  // пробуем расшифровать; просим пароль, пока не откроется
+  while (true) {
+    if (pw) {
+      try {
+        const plain = await decryptPayload(blob, pw);
+        localStorage.setItem("gab360pw", pw);
+        DATA = JSON.parse(plain);
+        break;
+      } catch (e) {
+        localStorage.removeItem("gab360pw");
+        gateErr.textContent = "Неверный пароль — попробуйте ещё раз";
+      }
+    }
+    pw = await askPassword();
+  }
+
+  document.getElementById("gate").classList.add("hide");
+  const srcs = [...new Set(DATA.listings.map(r => r.source))];
+  document.getElementById("fSrc").innerHTML =
+    `<option value="">Источник: все</option>` +
+    srcs.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
+  renderStats();
+  renderList(true);
+  document.getElementById("foot").textContent =
+    `объектов в базе: ${DATA.listings.length} · данные из открытых источников`;
+}
+
+function askPassword() {
+  return new Promise(resolve => {
+    const input = document.getElementById("pw");
+    const btn = document.getElementById("go");
+    input.value = "";
+    gateErrEl().textContent = "";
+    input.focus();
+    const submit = () => {
+      btn.removeEventListener("click", submit);
+      input.removeEventListener("keydown", keyH);
+      resolve(input.value);
+    };
+    const keyH = e => { if (e.key === "Enter") submit(); };
+    btn.addEventListener("click", submit);
+    input.addEventListener("keydown", keyH);
+  });
+}
+const gateErrEl = () => document.getElementById("gateErr");
+
+document.getElementById("q").addEventListener("input", e => {
+  state.q = e.target.value.trim(); renderList(true);
+});
+document.getElementById("fSrc").addEventListener("change", e => {
+  state.src = e.target.value; renderList(true);
+});
+document.getElementById("fYield").addEventListener("change", e => {
+  state.yMin = e.target.value; renderList(true);
+});
+document.getElementById("more").addEventListener("click", () => renderList(false));
+
+initChips();
+load();
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>
