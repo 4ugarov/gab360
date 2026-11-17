@@ -1,5 +1,7 @@
-// Service worker ГАБ 360: офлайн-кэш оболочки, данные — network-first.
-const SHELL = "gab360-shell-v1";
+// Service worker ГАБ 360: оболочка и данные — network-first (кэш для офлайна).
+// v2: index.html тоже network-first — иначе после обновления сайта браузер
+// продолжает показывать старую версию из кэша.
+const SHELL = "gab360-shell-v2";
 const SHELL_FILES = ["./", "./index.html", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (e) => {
@@ -18,8 +20,14 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
-  if (url.pathname.endsWith("data.json")) {
-    // данные: сначала сеть, при офлайне — последний успешный кэш
+  const isShell =
+    e.request.mode === "navigate" ||
+    url.pathname.endsWith("index.html") ||
+    url.pathname.endsWith("/") ||
+    url.pathname.endsWith("sw.js") ||
+    url.pathname.endsWith("manifest.json");
+  // всё, кроме самого data.json.enc, — network-first с офлайн-fallback
+  if (url.pathname.endsWith("data.json.enc") || isShell) {
     e.respondWith(
       fetch(e.request)
         .then((res) => {
@@ -31,7 +39,7 @@ self.addEventListener("fetch", (e) => {
     );
     return;
   }
-  // оболочка: кэш-первый
+  // статические ассеты (иконка и т.п.) — кэш-первый
   e.respondWith(
     caches.match(e.request).then(
       (hit) =>
