@@ -560,11 +560,11 @@ function renderPrices() {
     const ys = act.filter(r => r.price != null && r.price >= a && r.price < b && r.yield_pct)
                   .map(r => r.yield_pct);
     const med = median(ys);
-    const avg = ys.length ? ys.reduce((x,y)=>x+y,0)/ys.length : null;
     return `<div class="trow"><div class="name">${t}</div>
        <div class="cnt">${med ? med.toFixed(1) + "%" : "—"} <span style="color:var(--muted);font-size:10px">(${ys.length} шт)</span></div>
-     </div>`).join("") +
-    `<div class="hint">Медианная доходность сегмента — в какой цене рынок платит больше</div>`;
+     </div>`;
+  }).join("") +
+  `<div class="hint">Медианная доходность сегмента — в какой цене рынок платит больше</div>`;
 }
 
 // ---------- Дубли + концентрация ----------
