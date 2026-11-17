@@ -51,6 +51,15 @@
   .ana.closed .ana-head svg { transform:rotate(-90deg); }
   .ana-body { display:none; padding:0 12px 12px; }
   .ana:not(.closed) .ana-body { display:block; }
+  .atabs { display:flex; gap:4px; margin-bottom:10px; overflow-x:auto;
+           scrollbar-width:none; }
+  .atabs::-webkit-scrollbar { display:none; }
+  .atab { flex:0 0 auto; border:1px solid var(--border); background:var(--panel2);
+          color:var(--muted); border-radius:8px; padding:5px 10px; font-size:11.5px;
+          cursor:pointer; user-select:none; white-space:nowrap; }
+  .atab.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .atabpane { display:none; }
+  .atabpane.on { display:block; }
   .ana-note { color:var(--muted); font-size:10.5px; margin:2px 0 10px; }
   .atile { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .atile > div { background:var(--panel2); border-radius:10px; padding:8px 10px; }
@@ -73,10 +82,41 @@
   .bar i { position:absolute; inset:0 auto 0 0; background:var(--accent);
            border-radius:5px; opacity:.75; }
   .bar.m i { background:var(--green); }
+  .bar.r i { background:var(--red); }
   .bar span { position:absolute; inset:0; display:flex; align-items:center;
               justify-content:center; font-size:10px; color:#fff;
               font-variant-numeric:tabular-nums; }
   .hint { color:var(--muted); font-size:10px; margin-top:6px; }
+  /* динамика по дням */
+  .days { display:flex; align-items:flex-end; gap:3px; height:80px; margin:6px 0 4px; }
+  .days > div { flex:1; display:flex; flex-direction:column; align-items:center;
+                justify-content:flex-end; height:100%; }
+  .days .b { width:100%; background:var(--accent); border-radius:3px 3px 0 0;
+             opacity:.85; }
+  .days .lb { font-size:8.5px; color:var(--muted); margin-top:3px;
+              white-space:nowrap; }
+  .days .v { font-size:9px; color:var(--text); margin-bottom:2px;
+             font-variant-numeric:tabular-nums; }
+  .flow { display:flex; gap:8px; margin-top:10px; }
+  .flow > div { flex:1; background:var(--panel2); border-radius:10px; padding:8px 10px;
+                text-align:center; }
+  .flow b { display:block; font-size:16px; }
+  .flow .up b { color:var(--green); } .flow .dn b { color:var(--red); }
+  .flow span { color:var(--muted); font-size:10px; }
+  .drop { padding:7px 0; border-bottom:1px solid var(--border); }
+  .drop:last-child { border-bottom:none; }
+  .drop .a { font-size:12px; font-weight:600; overflow:hidden;
+             text-overflow:ellipsis; white-space:nowrap; }
+  .drop .p { font-size:12px; color:var(--red); font-variant-numeric:tabular-nums; }
+  .drop .d { color:var(--muted); font-size:10px; margin-top:2px; }
+  .drop a { color:inherit; text-decoration:none; display:block; }
+  .resetbar { margin:0 14px 10px; background:rgba(58,163,255,.12);
+              border:1px solid var(--accent); border-radius:10px; padding:8px 12px;
+              font-size:12.5px; display:flex; justify-content:space-between;
+              align-items:center; gap:8px; }
+  .resetbar button { background:var(--accent); color:#fff; border:none;
+                     border-radius:8px; padding:5px 12px; font-size:12px;
+                     cursor:pointer; flex:0 0 auto; }
   .list { padding:0 14px 30px; }
   .card { background:var(--panel); border:1px solid var(--border); border-radius:12px;
           padding:10px 12px; margin-bottom:10px; }
@@ -168,21 +208,56 @@
 
 <div class="ana" id="ana">
   <div class="ana-head" id="anaHead">
-    <b>Аналитика выборки</b>
+    <b>Аналитика</b>
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
          stroke-width="1.7" stroke-linecap="round">
       <path d="M3 6l5 5 5-5"/>
     </svg>
   </div>
   <div class="ana-body">
-    <div class="ana-note">Пересчитывается под активные фильтры</div>
-    <div class="atile" id="anaTiles"></div>
-    <div class="asec"><h4>Топ арендаторов</h4><div id="anaTenants"></div></div>
-    <div class="asec"><h4>Ценовые сегменты</h4><div id="anaPrice"></div></div>
-    <div class="asec"><h4>Источники</h4><div id="anaSrc"></div></div>
+    <div class="atabs" id="atabs"></div>
+    <div class="atabpane" data-pane="overview">
+      <div class="ana-note">Пересчитывается под активные фильтры</div>
+      <div class="atile" id="anaTiles"></div>
+      <div class="asec"><h4>Топ арендаторов</h4><div id="anaTenants"></div></div>
+      <div class="asec"><h4>Ценовые сегменты</h4><div id="anaPrice"></div></div>
+      <div class="asec"><h4>Источники</h4><div id="anaSrc"></div></div>
+    </div>
+    <div class="atabpane" data-pane="market">
+      <div class="ana-note">Рынок целиком за последние 14 дней</div>
+      <div class="asec"><h4>Новые объекты по дням</h4>
+        <div class="days" id="mktDays"></div>
+        <div class="flow">
+          <div class="up"><b id="mktIn">—</b><span>новых за 7 дней</span></div>
+          <div class="dn"><b id="mktOut">—</b><span>снято за 7 дней</span></div>
+          <div><b id="mktNet">—</b><span>чистый приток</span></div>
+        </div>
+      </div>
+      <div class="asec"><h4>Свежесть активных объявлений</h4><div id="mktFresh"></div></div>
+    </div>
+    <div class="atabpane" data-pane="geo">
+      <div class="ana-note">Клик по строке — фильтр этой станции или города</div>
+      <div class="asec"><h4>Топ-10 станций метро</h4><div id="geoMetro"></div></div>
+      <div class="asec"><h4>Города (Москва и МО)</h4><div id="geoCity"></div></div>
+    </div>
+    <div class="atabpane" data-pane="prices">
+      <div class="ana-note">История цен из базы (за 14 дней)</div>
+      <div class="asec"><h4>Самые упавшие в цене</h4><div id="prDrops"></div></div>
+      <div class="asec"><h4>Медианная ₽/м² по размеру</h4><div id="prSize"></div></div>
+      <div class="asec"><h4>Сегмент цены → медианная доходность</h4><div id="prMatrix"></div></div>
+    </div>
+    <div class="atabpane" data-pane="dups">
+      <div class="ana-note">Один объект у разных брокеров — разница цен как аргумент торга</div>
+      <div class="asec"><h4>Дубли с наибольшей разницей цен</h4><div id="dupList"></div></div>
+      <div class="asec"><h4>Концентрация арендаторов</h4><div id="dupConc"></div></div>
+    </div>
   </div>
 </div>
 
+<div class="resetbar" id="dupBar" style="display:none">
+  <span id="dupLabel"></span>
+  <button id="dupReset">Сбросить</button>
+</div>
 <div class="list" id="list"></div>
 <div style="padding:0 14px 20px;">
   <button class="more" id="more" style="display:none">Показать ещё</button>
@@ -196,8 +271,9 @@ const CHIPS = [
   ["", "Все"], ["new", "🆕 Новые"], ["anchor", "⚓ Якорь"],
   ["tenant", "С арендатором"], ["removed", "Снятые"]
 ];
-let DATA = { listings: [], generated_at: "", new_cutoff: "" };
-let state = { chip: "", src: "", yMin: "", q: "", price: "", area: "", tenant: "" };
+let DATA = { listings: [], price_changes: [], generated_at: "", new_cutoff: "" };
+let state = { chip: "", src: "", yMin: "", q: "", price: "", area: "",
+              tenant: "", dup: "" };
 let shown = 0;
 const PAGE = 30;
 
@@ -206,11 +282,13 @@ const fmtM = v => v == null ? "—" : (v >= 1e6 ? (v/1e6).toFixed(v >= 3e7 ? 0 :
 const esc = s => (s == null ? "" : String(s)).replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const isNew = r => r.first_seen >= DATA.new_cutoff && r.status === "active";
+const inMSK = iso => iso ? new Date(new Date(iso).getTime() + MSK_H*3600e3) : null;
+const mskDay = iso => { const d = inMSK(iso); return d ? d.toISOString().slice(0,10) : null; };
 
 function msk(iso) {
   if (!iso) return "—";
-  const d = new Date(iso);
-  return new Date(d.getTime() + MSK_H*3600e3).toISOString().slice(5,16).replace("T"," ");
+  const d = inMSK(iso);
+  return d ? d.toISOString().slice(5,16).replace("T"," ") : "—";
 }
 
 function median(arr) {
@@ -237,6 +315,11 @@ function renderStats() {
 
 function filtered() {
   const q = state.q.toLowerCase();
+  if (state.dup) {
+    return DATA.listings.filter(r => r.status === "active"
+      && r.dedup_group === state.dup)
+      .sort((a,b) => (a.price||0) - (b.price||0));
+  }
   return DATA.listings.filter(r => {
     if (state.chip === "new" && !isNew(r)) return false;
     if (state.chip === "anchor" && !r.anchor_tenant) return false;
@@ -257,13 +340,27 @@ function filtered() {
       if (b === 0 ? r.area < a : !(r.area >= a && r.area <= b)) return false;
     }
     if (q && !((r.address||"")+" "+(r.title||"")+" "+(r.tenant||"")+" "+
-        (r.metro||"")).toLowerCase().includes(q)) return false;
+        (r.metro||"")+" "+(r.city||"")).toLowerCase().includes(q)) return false;
     return true;
   }).sort((a,b) => (b.first_seen||"").localeCompare(a.first_seen||""));
 }
 
-// ---------- аналитика ----------
+// ---------- аналитика: общие ----------
+const barRow = (name, n, max, extra, cls, clickAttr) =>
+  `<div class="trow ${cls||""}" ${clickAttr ? clickAttr : ""}>
+     <div class="name">${esc(name)}</div>
+     <div class="bar ${cls==="m"?"m":""}"><i style="width:${Math.round(n/max*100)}%"></i><span>${n}</span></div>
+   </div>`;
+
 function renderAnalytics(rows) {
+  renderOverview(rows);
+  renderMarket();
+  renderGeo();
+  renderPrices();
+  renderDups();
+}
+
+function renderOverview(rows) {
   const act = rows.filter(r => r.status === "active");
   const areas = act.filter(r => r.area).map(r => r.area);
   const ppm = act.filter(r => r.price_per_m2).map(r => r.price_per_m2);
@@ -273,9 +370,9 @@ function renderAnalytics(rows) {
   const medPpm = median(ppm);
   const portfolio = act.filter(r => r.price).reduce((a,r)=>a+r.price, 0);
   const medPb = median(pbs);
-
   const fmtA = v => v >= 1000 ? (v/1000).toFixed(1) + " тыс. м²" : Math.round(v) + " м²";
   const fmtBig = v => v >= 1e9 ? (v/1e9).toFixed(1) + " млрд ₽" : fmtM(v);
+
   document.getElementById("anaTiles").innerHTML = [
     [act.length ? fmtA(totalArea) : "—", "общая площадь"],
     [medPpm ? Math.round(medPpm).toLocaleString("ru-RU") + " ₽" : "—",
@@ -284,7 +381,6 @@ function renderAnalytics(rows) {
     [medPb ? medPb.toFixed(1) + " лет" : "—", "медианная окупаемость"],
   ].map(([v,t]) => `<div><b>${v}</b><span>${t}</span></div>`).join("");
 
-  // топ арендаторов
   const tmap = {};
   act.forEach(r => { if (r.tenant) tmap[r.tenant] = (tmap[r.tenant]||0)+1; });
   const top = Object.entries(tmap).sort((a,b) => b[1]-a[1]).slice(0, 5);
@@ -303,7 +399,6 @@ function renderAnalytics(rows) {
       refresh(true);
     }));
 
-  // ценовые сегменты
   const segs = [["до 20 млн", r => r.price && r.price < 20e6],
                 ["20–50 млн", r => r.price && r.price >= 20e6 && r.price < 50e6],
                 ["50–100 млн", r => r.price && r.price >= 50e6 && r.price < 100e6],
@@ -315,7 +410,6 @@ function renderAnalytics(rows) {
        <div class="bar"><i style="width:${Math.round(n/smax*100)}%"></i><span>${n}</span></div>
      </div>`).join("");
 
-  // источники
   const smap = {};
   act.forEach(r => { smap[r.source] = (smap[r.source]||0)+1; });
   const srt = Object.entries(smap).sort((a,b) => b[1]-a[1]);
@@ -331,6 +425,203 @@ function renderAnalytics(rows) {
       document.getElementById("fSrc").value = state.src;
       refresh(true);
     }));
+}
+
+// ---------- Рынок ----------
+function renderMarket() {
+  const act = DATA.listings.filter(r => r.status === "active");
+  // 14 дней по дням (МСК)
+  const today = new Date(Date.now() + MSK_H*3600e3);
+  const counts = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(today.getTime() - i*864e5);
+    const day = d.toISOString().slice(0,10);
+    counts.push([day, act.filter(r => mskDay(r.first_seen) === day).length]);
+  }
+  const dmax = Math.max(1, ...counts.map(c => c[1]));
+  document.getElementById("mktDays").innerHTML = counts.map(([day, n], i) =>
+    `<div><div class="v">${n}</div><div class="b" style="height:${Math.max(4, Math.round(n/dmax*58))}px"></div>
+     <div class="lb">${i % 3 === 0 || i === 13 ? day.slice(8,10) + "." + day.slice(5,7) : ""}</div></div>`).join("");
+
+  const in7 = iso => iso && (Date.now() - new Date(iso).getTime()) <= 7*864e5;
+  const new7 = act.filter(r => in7(r.first_seen)).length;
+  const removed = DATA.listings.filter(r => r.status === "removed" && in7(r.removed_at));
+  const rem7 = removed.length;
+  const net = new7 - rem7;
+  document.getElementById("mktIn").textContent = "+" + new7;
+  document.getElementById("mktOut").textContent = "−" + rem7;
+  const netEl = document.getElementById("mktNet");
+  netEl.textContent = (net >= 0 ? "+" : "−") + Math.abs(net);
+  netEl.style.color = net > 0 ? "var(--green)" : (net < 0 ? "var(--red)" : "var(--text)");
+
+  // свежесть
+  const buckets = [["Сегодня (24 ч)", 24e5*24], ["1–3 дня", 72e5], ["4–7 дней", 168e5], ["старше недели", Infinity]];
+  let prev = 0;
+  const fresh = buckets.map(([t, lim]) => {
+    const n = act.filter(r => {
+      const age = Date.now() - new Date(r.first_seen).getTime();
+      return age >= prev && age < lim;
+    }).length;
+    prev = lim;
+    return [t, n];
+  });
+  const fmax = Math.max(1, ...fresh.map(f => f[1]));
+  document.getElementById("mktFresh").innerHTML = fresh.map(([t, n]) =>
+    barRow(t, n, fmax)).join("");
+}
+
+// ---------- Гео ----------
+function renderGeo() {
+  const act = DATA.listings.filter(r => r.status === "active");
+  // метро: первичная станция (до запятой)
+  const mmap = {};
+  act.forEach(r => {
+    if (!r.metro) return;
+    const st = r.metro.split(",")[0].trim();
+    if (st) mmap[st] = (mmap[st]||0)+1;
+  });
+  const metro = Object.entries(mmap).sort((a,b) => b[1]-a[1]).slice(0, 10);
+  const mmax = Math.max(1, ...metro.map(m => m[1]));
+  document.getElementById("geoMetro").innerHTML = metro.length
+    ? metro.map(([s, n]) =>
+        `<div class="trow act" data-q="${esc(s)}"><div class="name">📍 ${esc(s)}</div>
+         <div class="bar"><i style="width:${Math.round(n/mmax*100)}%"></i><span>${n}</span></div></div>`).join("")
+    : `<div class="hint">Нет данных по метро</div>`;
+  document.querySelectorAll("#geoMetro .trow").forEach(el =>
+    el.addEventListener("click", () => {
+      state.q = el.dataset.q;
+      document.getElementById("q").value = state.q;
+      refresh(true);
+    }));
+
+  // города
+  const cmap = {};
+  act.forEach(r => {
+    if (!r.city) return;
+    if (!cmap[r.city]) cmap[r.city] = { n: 0, ys: [], ppm: [] };
+    cmap[r.city].n += 1;
+    if (r.yield_pct) cmap[r.city].ys.push(r.yield_pct);
+    if (r.price_per_m2) cmap[r.city].ppm.push(r.price_per_m2);
+  });
+  const cities = Object.entries(cmap).map(([c, v]) =>
+    ({ c, n: v.n, y: median(v.ys), ppm: median(v.ppm) }))
+    .sort((a,b) => b.n - a.n).slice(0, 12);
+  const cmax = Math.max(1, ...cities.map(c => c.n));
+  document.getElementById("geoCity").innerHTML = cities.map(v =>
+    `<div class="trow act" data-q="${esc(v.c)}">
+       <div class="name">${esc(v.c)}${v.y ? ` · ${v.y.toFixed(1)}%` : ""}${v.ppm ? ` · ${Math.round(v.ppm).toLocaleString("ru-RU")} ₽/м²` : ""}</div>
+       <div class="bar"><i style="width:${Math.round(v.n/cmax*100)}%"></i><span>${v.n}</span></div>
+     </div>`).join("");
+  document.querySelectorAll("#geoCity .trow").forEach(el =>
+    el.addEventListener("click", () => {
+      state.q = el.dataset.q;
+      document.getElementById("q").value = state.q;
+      refresh(true);
+    }));
+}
+
+// ---------- Цены ----------
+function renderPrices() {
+  const act = DATA.listings.filter(r => r.status === "active");
+  // изменения цен
+  const ch = (DATA.price_changes || []).map(c => {
+    const pct = c.old_price ? (c.new_price - c.old_price) / c.old_price * 100 : 0;
+    return { ...c, pct };
+  });
+  const drops = ch.filter(c => c.pct < 0).sort((a,b) => a.pct - b.pct).slice(0, 6);
+  const rises = ch.filter(c => c.pct > 0).length;
+  document.getElementById("prDrops").innerHTML = drops.length
+    ? drops.map(c =>
+        `<div class="drop"><a href="${esc(c.url || "#")}" target="_blank" rel="noopener">
+           <div class="a">${esc(c.address || "объект")} <span class="src">${esc(c.source)}</span></div>
+           <div class="p">${fmtM(c.old_price)} → ${fmtM(c.new_price)} (${c.pct.toFixed(1)}%)</div>
+           <div class="d">${msk(c.ts)} МСК · подорожавших за 14 дней: ${rises}</div>
+         </a></div>`).join("")
+    : `<div class="hint">За 14 дней изменений цен не зафиксировано</div>`;
+
+  // ₽/м² по размерам
+  const sizeB = [["до 50 м²", 0, 50], ["50–100 м²", 50, 100],
+                 ["100–200 м²", 100, 200], ["от 200 м²", 200, Infinity]];
+  const ppmBySize = sizeB.map(([t, a, b]) => {
+    const v = act.filter(r => r.area != null && r.area >= a && (b === Infinity || r.area < b)
+                             && r.price_per_m2).map(r => r.price_per_m2);
+    return [t, median(v)];
+  });
+  document.getElementById("prSize").innerHTML = ppmBySize.map(([t, v]) =>
+    `<div class="trow"><div class="name">${t}</div>
+       <div class="cnt">${v ? Math.round(v).toLocaleString("ru-RU") + " ₽" : "—"}</div>
+     </div>`).join("") +
+    `<div class="hint">Меньше помещение → выше ₽/м². Крупный формат почти всегда дешевле за метр</div>`;
+
+  // матрица сегмент × доходность
+  const segs = [["до 20 млн", 0, 20e6], ["20–50 млн", 20e6, 50e6],
+                ["50–100 млн", 50e6, 100e6], ["от 100 млн", 100e6, Infinity]];
+  document.getElementById("prMatrix").innerHTML = segs.map(([t, a, b]) => {
+    const ys = act.filter(r => r.price != null && r.price >= a && r.price < b && r.yield_pct)
+                  .map(r => r.yield_pct);
+    const med = median(ys);
+    const avg = ys.length ? ys.reduce((x,y)=>x+y,0)/ys.length : null;
+    return `<div class="trow"><div class="name">${t}</div>
+       <div class="cnt">${med ? med.toFixed(1) + "%" : "—"} <span style="color:var(--muted);font-size:10px">(${ys.length} шт)</span></div>
+     </div>`).join("") +
+    `<div class="hint">Медианная доходность сегмента — в какой цене рынок платит больше</div>`;
+}
+
+// ---------- Дубли + концентрация ----------
+function renderDups() {
+  const act = DATA.listings.filter(r => r.status === "active");
+  const groups = {};
+  act.forEach(r => {
+    if (!r.dedup_group) return;
+    if (!groups[r.dedup_group]) groups[r.dedup_group] = [];
+    groups[r.dedup_group].push(r);
+  });
+  const dups = Object.entries(groups)
+    .filter(([g, arr]) => arr.length >= 2)
+    .map(([g, arr]) => {
+      const prices = arr.map(r => r.price).filter(Boolean);
+      const spread = prices.length >= 2 ? Math.max(...prices) - Math.min(...prices) : 0;
+      const lo = prices.length ? Math.min(...prices) : 0;
+      const hi = prices.length ? Math.max(...prices) : 0;
+      return { g, n: arr.length, lo, hi, spread,
+               addr: (arr[0].address || arr[0].title || "").slice(0, 60),
+               pct: lo ? Math.round(spread / lo * 100) : 0 };
+    })
+    .sort((a,b) => b.spread - a.spread).slice(0, 6);
+  document.getElementById("dupList").innerHTML = dups.length
+    ? dups.map(d =>
+        `<div class="trow act" data-g="${esc(d.g)}">
+           <div style="flex:1;min-width:0">
+             <div class="name" style="white-space:normal">${esc(d.addr)}</div>
+             <div class="hint">${d.n} объявления · ${fmtM(d.lo)} – ${fmtM(d.hi)} · разница ${d.pct}%</div>
+           </div>
+         </div>`).join("")
+      : `<div class="hint">Дублей между брокерами пока не найдено</div>`;
+  document.querySelectorAll("#dupList .trow").forEach(el =>
+    el.addEventListener("click", () => {
+      state.dup = el.dataset.g;
+      refresh(true);
+    }));
+
+  // концентрация арендаторов
+  const withT = act.filter(r => r.tenant);
+  const tmap = {};
+  withT.forEach(r => { tmap[r.tenant] = (tmap[r.tenant]||0)+1; });
+  const top5 = Object.entries(tmap).sort((a,b) => b[1]-a[1]).slice(0, 5);
+  const top5n = top5.reduce((a,[,n])=>a+n, 0);
+  const otherN = withT.length - top5n;
+  const noT = act.length - withT.length;
+  const total = act.length || 1;
+  const rows = [
+    ...top5.map(([t, n]) => [`⚓ ${t}`, n, "m"]),
+    ["Другие сети/бренды", otherN, ""],
+    ["Без арендатора", noT, ""],
+  ];
+  document.getElementById("dupConc").innerHTML = rows.map(([t, n, cls]) =>
+    `<div class="trow"><div class="name">${esc(t)}</div>
+       <div class="bar ${cls}"><i style="width:${Math.round(n/total*100)}%"></i><span>${Math.round(n/total*100)}%</span></div>
+     </div>`).join("") +
+    `<div class="hint">Топ-5 сетей занимают ${Math.round(top5n/total*100)}% всей базы (${top5n} из ${total})</div>`;
 }
 
 // ---------- карточки ----------
@@ -351,7 +642,7 @@ function card(r) {
   return `<div class="card">
     <div class="top"><div class="addr">${esc(r.address || r.title || "—")}</div>
       <div class="src">${esc(r.source)} · ${esc((r.first_seen||"").slice(5,10))}</div></div>
-    <div class="line2">📍 ${esc(r.metro || "метро не указано")} · ${r.area || "—"} м²${r.price_per_m2 ? " · " + Math.round(r.price_per_m2).toLocaleString("ru-RU") + " ₽/м²" : ""}</div>
+    <div class="line2">📍 ${esc(r.metro || "метро не указано")} · ${r.area || "—"} м²${r.price_per_m2 ? " · " + Math.round(r.price_per_m2).toLocaleString("ru-RU") + " ₽/м²" : ""}${r.city && r.city !== "Москва" ? " · " + esc(r.city) : ""}</div>
     <div class="nums">
       <div><span>Цена</span><b>${price}</b></div>
       <div><span>Аренда/мес</span><b>${rent} ₽</b></div>
@@ -367,6 +658,14 @@ function renderList(reset) {
   const rows = filtered();
   const list = document.getElementById("list");
   renderAnalytics(rows);
+  const bar = document.getElementById("dupBar");
+  if (state.dup) {
+    bar.style.display = "flex";
+    document.getElementById("dupLabel").textContent =
+      "Показаны объявления одного объекта (сравните цены брокеров)";
+  } else {
+    bar.style.display = "none";
+  }
   if (reset) { list.innerHTML = ""; shown = 0; }
   if (!rows.length) {
     list.innerHTML = `<div class="empty">Ничего не найдено — ослабьте фильтры</div>`;
@@ -436,7 +735,6 @@ async function load() {
   document.getElementById("fSrc").innerHTML =
     `<option value="">Источник: все</option>` +
     srcs.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
-  // топ-15 арендаторов в фильтр
   const tmap = {};
   DATA.listings.filter(r => r.status === "active" && r.tenant)
     .forEach(r => { tmap[r.tenant] = (tmap[r.tenant]||0)+1; });
@@ -490,6 +788,28 @@ document.getElementById("fTenant").addEventListener("change", e => {
 document.getElementById("more").addEventListener("click", () => renderList(false));
 document.getElementById("anaHead").addEventListener("click", () =>
   document.getElementById("ana").classList.toggle("closed"));
+document.getElementById("dupReset").addEventListener("click", () => {
+  state.dup = ""; refresh(true);
+});
+
+// вкладки аналитики
+const TABS = [["overview", "Обзор"], ["market", "Рынок"], ["geo", "Гео"],
+              ["prices", "Цены"], ["dups", "Дубли"]];
+let curTab = "overview";
+function initTabs() {
+  const box = document.getElementById("atabs");
+  box.innerHTML = TABS.map(([v, t]) =>
+    `<div class="atab ${curTab===v?"on":""}" data-t="${v}">${t}</div>`).join("");
+  box.querySelectorAll(".atab").forEach(el => el.addEventListener("click", () => {
+    curTab = el.dataset.t;
+    box.querySelectorAll(".atab").forEach(x => x.classList.toggle("on", x === el));
+    document.querySelectorAll(".atabpane").forEach(p =>
+      p.classList.toggle("on", p.dataset.pane === curTab));
+  }));
+  document.querySelectorAll(".atabpane").forEach(p =>
+    p.classList.toggle("on", p.dataset.pane === curTab));
+}
+initTabs();
 
 initChips();
 load();
