@@ -35,12 +35,48 @@
   .chips::-webkit-scrollbar { display:none; }
   .chip { flex:0 0 auto; border:1px solid var(--border); background:var(--panel2);
           color:var(--muted); border-radius:20px; padding:6px 12px; font-size:12.5px;
-          cursor:pointer; user-select:none; }
+          cursor:pointer; user-select:none; white-space:nowrap; }
   .chip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
   .selrow { display:flex; gap:8px; padding-bottom:6px; }
-  .selrow select { flex:1; background:var(--panel2); border:1px solid var(--border);
+  .selrow select { flex:1; min-width:0; background:var(--panel2); border:1px solid var(--border);
                    color:var(--text); border-radius:10px; padding:8px; font-size:12.5px;
                    outline:none; }
+  /* ---------- аналитика ---------- */
+  .ana { margin:6px 14px 12px; background:var(--panel); border:1px solid var(--border);
+         border-radius:12px; overflow:hidden; }
+  .ana-head { display:flex; align-items:center; justify-content:space-between;
+              padding:10px 12px; cursor:pointer; user-select:none; }
+  .ana-head b { font-size:13px; letter-spacing:.3px; }
+  .ana-head svg { transition:transform .2s; }
+  .ana.closed .ana-head svg { transform:rotate(-90deg); }
+  .ana-body { display:none; padding:0 12px 12px; }
+  .ana:not(.closed) .ana-body { display:block; }
+  .ana-note { color:var(--muted); font-size:10.5px; margin:2px 0 10px; }
+  .atile { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .atile > div { background:var(--panel2); border-radius:10px; padding:8px 10px; }
+  .atile b { display:block; font-size:15px; font-variant-numeric:tabular-nums; }
+  .atile span { color:var(--muted); font-size:10px; }
+  .asec { margin-top:12px; }
+  .asec h4 { margin:0 0 8px; font-size:11px; text-transform:uppercase;
+             letter-spacing:.5px; color:var(--muted); font-weight:600; }
+  .trow { display:flex; align-items:center; gap:8px; padding:6px 0;
+          border-bottom:1px solid var(--border); }
+  .trow:last-child { border-bottom:none; }
+  .trow .name { flex:1; font-size:13px; min-width:0; overflow:hidden;
+                text-overflow:ellipsis; white-space:nowrap; }
+  .trow .cnt { color:var(--accent); font-weight:600; font-size:12.5px;
+               font-variant-numeric:tabular-nums; }
+  .trow.act { cursor:pointer; }
+  .trow.act .name { color:var(--accent); }
+  .bar { position:relative; flex:0 0 90px; height:14px; background:var(--panel2);
+         border-radius:5px; overflow:hidden; }
+  .bar i { position:absolute; inset:0 auto 0 0; background:var(--accent);
+           border-radius:5px; opacity:.75; }
+  .bar.m i { background:var(--green); }
+  .bar span { position:absolute; inset:0; display:flex; align-items:center;
+              justify-content:center; font-size:10px; color:#fff;
+              font-variant-numeric:tabular-nums; }
+  .hint { color:var(--muted); font-size:10px; margin-top:6px; }
   .list { padding:0 14px 30px; }
   .card { background:var(--panel); border:1px solid var(--border); border-radius:12px;
           padding:10px 12px; margin-bottom:10px; }
@@ -59,7 +95,6 @@
   .b-new { background:rgba(56,193,114,.15); color:var(--green); }
   .b-anc { background:rgba(58,163,255,.15); color:var(--accent); }
   .b-rem { background:rgba(224,82,82,.15); color:var(--red); }
-  .b-dup { background:rgba(125,147,168,.15); color:var(--muted); }
   .b-warn { background:rgba(255,184,51,.15); color:var(--yellow); }
   .btn { display:block; text-align:center; margin-top:8px; background:var(--panel2);
          color:var(--accent); border:1px solid var(--border); border-radius:10px;
@@ -98,6 +133,7 @@
   <div class="sub">Готовый арендный бизнес · Москва и МО · <span id="upd">—</span></div>
 </header>
 <div class="stats" id="stats"></div>
+
 <div style="padding:0 14px;">
   <input class="search" id="q" placeholder="🔎 Адрес, арендатор, метро…">
   <div class="chips" id="chips"></div>
@@ -111,7 +147,42 @@
       <option value="15">от 15%</option>
     </select>
   </div>
+  <div class="selrow">
+    <select id="fPrice">
+      <option value="">Цена: любая</option>
+      <option value="0-20">до 20 млн</option>
+      <option value="20-50">20–50 млн</option>
+      <option value="50-100">50–100 млн</option>
+      <option value="100-0">от 100 млн</option>
+    </select>
+    <select id="fArea">
+      <option value="">Площадь: любая</option>
+      <option value="0-50">до 50 м²</option>
+      <option value="50-100">50–100 м²</option>
+      <option value="100-200">100–200 м²</option>
+      <option value="200-0">от 200 м²</option>
+    </select>
+    <select id="fTenant"><option value="">Арендатор: все</option></select>
+  </div>
 </div>
+
+<div class="ana" id="ana">
+  <div class="ana-head" id="anaHead">
+    <b>Аналитика выборки</b>
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round">
+      <path d="M3 6l5 5 5-5"/>
+    </svg>
+  </div>
+  <div class="ana-body">
+    <div class="ana-note">Пересчитывается под активные фильтры</div>
+    <div class="atile" id="anaTiles"></div>
+    <div class="asec"><h4>Топ арендаторов</h4><div id="anaTenants"></div></div>
+    <div class="asec"><h4>Ценовые сегменты</h4><div id="anaPrice"></div></div>
+    <div class="asec"><h4>Источники</h4><div id="anaSrc"></div></div>
+  </div>
+</div>
+
 <div class="list" id="list"></div>
 <div style="padding:0 14px 20px;">
   <button class="more" id="more" style="display:none">Показать ещё</button>
@@ -126,7 +197,7 @@ const CHIPS = [
   ["tenant", "С арендатором"], ["removed", "Снятые"]
 ];
 let DATA = { listings: [], generated_at: "", new_cutoff: "" };
-let state = { chip: "", src: "", yMin: "", q: "" };
+let state = { chip: "", src: "", yMin: "", q: "", price: "", area: "", tenant: "" };
 let shown = 0;
 const PAGE = 30;
 
@@ -140,6 +211,13 @@ function msk(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
   return new Date(d.getTime() + MSK_H*3600e3).toISOString().slice(5,16).replace("T"," ");
+}
+
+function median(arr) {
+  if (!arr.length) return null;
+  const s = [...arr].sort((a,b) => a-b);
+  const m = Math.floor(s.length/2);
+  return s.length % 2 ? s[m] : (s[m-1]+s[m])/2;
 }
 
 function renderStats() {
@@ -167,12 +245,94 @@ function filtered() {
     if (state.chip !== "removed" && r.status !== "active") return false;
     if (state.src && r.source !== state.src) return false;
     if (state.yMin && (r.yield_pct == null || r.yield_pct < +state.yMin)) return false;
+    if (state.tenant && (r.tenant || "") !== state.tenant) return false;
+    if (state.price) {
+      const [a, b] = state.price.split("-").map(Number);
+      if (r.price == null) return false;
+      if (b === 0 ? r.price < a * 1e6 : !(r.price >= a*1e6 && r.price <= b*1e6)) return false;
+    }
+    if (state.area) {
+      const [a, b] = state.area.split("-").map(Number);
+      if (r.area == null) return false;
+      if (b === 0 ? r.area < a : !(r.area >= a && r.area <= b)) return false;
+    }
     if (q && !((r.address||"")+" "+(r.title||"")+" "+(r.tenant||"")+" "+
         (r.metro||"")).toLowerCase().includes(q)) return false;
     return true;
   }).sort((a,b) => (b.first_seen||"").localeCompare(a.first_seen||""));
 }
 
+// ---------- аналитика ----------
+function renderAnalytics(rows) {
+  const act = rows.filter(r => r.status === "active");
+  const areas = act.filter(r => r.area).map(r => r.area);
+  const ppm = act.filter(r => r.price_per_m2).map(r => r.price_per_m2);
+  const pbs = act.filter(r => r.payback_years).map(r => r.payback_years);
+  const totalArea = areas.reduce((a,b)=>a+b, 0);
+  const avgPpm = ppm.length ? ppm.reduce((a,b)=>a+b,0)/ppm.length : null;
+  const medPpm = median(ppm);
+  const portfolio = act.filter(r => r.price).reduce((a,r)=>a+r.price, 0);
+  const medPb = median(pbs);
+
+  const fmtA = v => v >= 1000 ? (v/1000).toFixed(1) + " тыс. м²" : Math.round(v) + " м²";
+  document.getElementById("anaTiles").innerHTML = [
+    [act.length ? fmtA(totalArea) : "—", "общая площадь"],
+    [avgPpm ? Math.round(avgPpm).toLocaleString("ru-RU") + " ₽" : "—",
+     "средняя ₽/м² (медиана " + (medPpm ? Math.round(medPpm).toLocaleString("ru-RU") : "—") + ")"],
+    [portfolio ? fmtM(portfolio) : "—", "стоимость выборки"],
+    [medPb ? medPb.toFixed(1) + " лет" : "—", "медианная окупаемость"],
+  ].map(([v,t]) => `<div><b>${v}</b><span>${t}</span></div>`).join("");
+
+  // топ арендаторов
+  const tmap = {};
+  act.forEach(r => { if (r.tenant) tmap[r.tenant] = (tmap[r.tenant]||0)+1; });
+  const top = Object.entries(tmap).sort((a,b) => b[1]-a[1]).slice(0, 5);
+  const tmax = top.length ? top[0][1] : 1;
+  document.getElementById("anaTenants").innerHTML = top.length
+    ? top.map(([name, n]) =>
+        `<div class="trow act" data-t="${esc(name)}">
+           <div class="name">${esc(name)}</div>
+           <div class="bar m"><i style="width:${Math.round(n/tmax*100)}%"></i><span>${n}</span></div>
+         </div>`).join("")
+      : `<div class="hint">В выборке нет объектов с указанным арендатором</div>`;
+  document.querySelectorAll("#anaTenants .trow").forEach(el =>
+    el.addEventListener("click", () => {
+      state.tenant = el.dataset.t;
+      document.getElementById("fTenant").value = state.tenant;
+      refresh(true);
+    }));
+
+  // ценовые сегменты
+  const segs = [["до 20 млн", r => r.price && r.price < 20e6],
+                ["20–50 млн", r => r.price && r.price >= 20e6 && r.price < 50e6],
+                ["50–100 млн", r => r.price && r.price >= 50e6 && r.price < 100e6],
+                ["от 100 млн", r => r.price && r.price >= 100e6]];
+  const scounts = segs.map(([t, f]) => [t, act.filter(f).length]);
+  const smax = Math.max(1, ...scounts.map(s => s[1]));
+  document.getElementById("anaPrice").innerHTML = scounts.map(([t, n]) =>
+    `<div class="trow"><div class="name">${t}</div>
+       <div class="bar"><i style="width:${Math.round(n/smax*100)}%"></i><span>${n}</span></div>
+     </div>`).join("");
+
+  // источники
+  const smap = {};
+  act.forEach(r => { smap[r.source] = (smap[r.source]||0)+1; });
+  const srt = Object.entries(smap).sort((a,b) => b[1]-a[1]);
+  const srtmax = Math.max(1, ...srt.map(s => s[1]));
+  document.getElementById("anaSrc").innerHTML = srt.map(([s, n]) =>
+    `<div class="trow act" data-s="${esc(s)}">
+       <div class="name">${esc(s)}</div>
+       <div class="bar"><i style="width:${Math.round(n/srtmax*100)}%"></i><span>${n}</span></div>
+     </div>`).join("");
+  document.querySelectorAll("#anaSrc .trow").forEach(el =>
+    el.addEventListener("click", () => {
+      state.src = el.dataset.s;
+      document.getElementById("fSrc").value = state.src;
+      refresh(true);
+    }));
+}
+
+// ---------- карточки ----------
 function card(r) {
   const price = fmtM(r.price);
   const rent = r.rent_month ? Math.round(r.rent_month).toLocaleString("ru-RU") : "—";
@@ -190,7 +350,7 @@ function card(r) {
   return `<div class="card">
     <div class="top"><div class="addr">${esc(r.address || r.title || "—")}</div>
       <div class="src">${esc(r.source)} · ${esc((r.first_seen||"").slice(5,10))}</div></div>
-    <div class="line2">📍 ${esc(r.metro || "метро не указано")} · ${r.area || "—"} м²</div>
+    <div class="line2">📍 ${esc(r.metro || "метро не указано")} · ${r.area || "—"} м²${r.price_per_m2 ? " · " + Math.round(r.price_per_m2).toLocaleString("ru-RU") + " ₽/м²" : ""}</div>
     <div class="nums">
       <div><span>Цена</span><b>${price}</b></div>
       <div><span>Аренда/мес</span><b>${rent} ₽</b></div>
@@ -205,6 +365,7 @@ function card(r) {
 function renderList(reset) {
   const rows = filtered();
   const list = document.getElementById("list");
+  renderAnalytics(rows);
   if (reset) { list.innerHTML = ""; shown = 0; }
   if (!rows.length) {
     list.innerHTML = `<div class="empty">Ничего не найдено — ослабьте фильтры</div>`;
@@ -218,6 +379,8 @@ function renderList(reset) {
   more.style.display = shown < rows.length ? "block" : "none";
   more.textContent = `Показать ещё (${shown} из ${rows.length})`;
 }
+
+function refresh(reset) { renderList(reset); }
 
 function initChips() {
   const box = document.getElementById("chips");
@@ -248,12 +411,10 @@ const b64buf = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
 async function load() {
   const gateErr = document.getElementById("gateErr");
   let pw = localStorage.getItem("gab360pw") || "";
-  let blob = null;
 
   const res = await fetch("data.json.enc?v=" + Date.now());
-  blob = await res.text();
+  const blob = await res.text();
 
-  // пробуем расшифровать; просим пароль, пока не откроется
   while (true) {
     if (pw) {
       try {
@@ -274,6 +435,14 @@ async function load() {
   document.getElementById("fSrc").innerHTML =
     `<option value="">Источник: все</option>` +
     srcs.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
+  // топ-15 арендаторов в фильтр
+  const tmap = {};
+  DATA.listings.filter(r => r.status === "active" && r.tenant)
+    .forEach(r => { tmap[r.tenant] = (tmap[r.tenant]||0)+1; });
+  const t15 = Object.entries(tmap).sort((a,b) => b[1]-a[1]).slice(0, 15);
+  document.getElementById("fTenant").innerHTML =
+    `<option value="">Арендатор: все</option>` +
+    t15.map(([t, n]) => `<option value="${esc(t)}">${esc(t)} (${n})</option>`).join("");
   renderStats();
   renderList(true);
   document.getElementById("foot").textContent =
@@ -308,7 +477,18 @@ document.getElementById("fSrc").addEventListener("change", e => {
 document.getElementById("fYield").addEventListener("change", e => {
   state.yMin = e.target.value; renderList(true);
 });
+document.getElementById("fPrice").addEventListener("change", e => {
+  state.price = e.target.value; renderList(true);
+});
+document.getElementById("fArea").addEventListener("change", e => {
+  state.area = e.target.value; renderList(true);
+});
+document.getElementById("fTenant").addEventListener("change", e => {
+  state.tenant = e.target.value; renderList(true);
+});
 document.getElementById("more").addEventListener("click", () => renderList(false));
+document.getElementById("anaHead").addEventListener("click", () =>
+  document.getElementById("ana").classList.toggle("closed"));
 
 initChips();
 load();
