@@ -632,32 +632,52 @@ function renderPrices() {
          </a></div>`).join("")
     : `<div class="hint">За 14 дней изменений цен не зафиксировано</div>`;
 
-  // ₽/м² по размерам
-  const sizeB = [["до 50 м²", 0, 50], ["50–100 м²", 50, 100],
-                 ["100–200 м²", 100, 200], ["от 200 м²", 200, Infinity]];
-  const ppmBySize = sizeB.map(([t, a, b]) => {
-    const v = act.filter(r => r.area != null && r.area >= a && (b === Infinity || r.area < b)
-                             && r.price_per_m2).map(r => r.price_per_m2);
-    return [t, median(v)];
-  });
-  document.getElementById("prSize").innerHTML = ppmBySize.map(([t, v]) =>
-    `<div class="trow"><div class="name">${t}</div>
-       <div class="cnt">${v ? Math.round(v).toLocaleString("ru-RU") + " ₽" : "—"}</div>
-     </div>`).join("") +
-    `<div class="hint">Меньше помещение → выше ₽/м². Крупный формат почти всегда дешевле за метр</div>`;
+  // ₽/м² по размерам с шагом 50 — все показатели
+  const sizeB = [[0, 50], [50, 100], [100, 150], [150, 200], [200, 250], [250, 300], [300, Infinity]];
+  const sLabel = ([a, b]) => a === 0 ? "до " + b + " м²" :
+    (b === Infinity ? "от " + a + " м²" : a + "–" + b + " м²");
+  document.getElementById("prSize").innerHTML = (() => {
+    let h = `<table class="heat"><tr><th>Размер</th><th>Объектов</th><th>Медианная цена</th>` +
+      `<th>₽/м² (медиана)</th><th>Доходность</th><th>Окупаемость</th></tr>`;
+    for (const [a, b] of sizeB) {
+      const arr = act.filter(r => r.area != null && r.area >= a &&
+        (b === Infinity || r.area < b));
+      const ppm = median(arr.filter(r => r.price_per_m2).map(r => r.price_per_m2));
+      const mp = median(arr.filter(r => r.price).map(r => r.price));
+      const my = median(arr.filter(r => r.yield_pct).map(r => r.yield_pct));
+      const pb = median(arr.filter(r => r.payback_years).map(r => r.payback_years));
+      h += `<tr><th>${sLabel([a, b])}</th><td>${arr.length || "—"}</td>` +
+        `<td>${mp ? fmtM(mp) : "—"}</td>` +
+        `<td>${ppm ? Math.round(ppm).toLocaleString("ru-RU") + " ₽" : "—"}</td>` +
+        `<td>${my ? my.toFixed(1) + "%" : "—"}</td>` +
+        `<td>${pb ? pb.toFixed(1) + " лет" : "—"}</td></tr>`;
+    }
+    return h + `</table><div class="hint">Меньше помещение → выше ₽/м²</div>`;
+  })();
 
-  // матрица сегмент × доходность
-  const segs = [["до 20 млн", 0, 20e6], ["20–50 млн", 20e6, 50e6],
-                ["50–100 млн", 50e6, 100e6], ["от 100 млн", 100e6, Infinity]];
-  document.getElementById("prMatrix").innerHTML = segs.map(([t, a, b]) => {
-    const ys = act.filter(r => r.price != null && r.price >= a && r.price < b && r.yield_pct)
-                  .map(r => r.yield_pct);
-    const med = median(ys);
-    return `<div class="trow"><div class="name">${t}</div>
-       <div class="cnt">${med ? med.toFixed(1) + "%" : "—"} <span style="color:var(--muted);font-size:10px">(${ys.length} шт)</span></div>
-     </div>`;
-  }).join("") +
-  `<div class="hint">Медианная доходность сегмента — в какой цене рынок платит больше</div>`;
+  // матрица сегмент × доходность с шагом 50 млн — все показатели
+  const segs = [[0, 50], [50, 100], [100, 150], [150, 200], [200, Infinity]];
+  const pL = ([a, b]) => a === 0 ? "до " + b + " млн" :
+    (b === Infinity ? "от " + a + " млн" : a + "–" + b + " млн");
+  const allMedY = median(act.filter(r => r.yield_pct).map(r => r.yield_pct));
+  document.getElementById("prMatrix").innerHTML = (() => {
+    let h = `<table class="heat"><tr><th>Сегмент цены</th><th>Объектов</th>` +
+      `<th>Доходность (медиана)</th><th>₽/м² (медиана)</th><th>Аренда (медиана)</th><th>Окупаемость</th></tr>`;
+    for (const [a, b] of segs) {
+      const arr = act.filter(r => r.price != null && r.price >= a * 1e6 &&
+        (b === Infinity || r.price < b * 1e6));
+      const yld = median(arr.filter(r => r.yield_pct).map(r => r.yield_pct));
+      const ppm = median(arr.filter(r => r.price_per_m2).map(r => r.price_per_m2));
+      const rent = median(arr.filter(r => r.rent_month).map(r => r.rent_month));
+      const pb = median(arr.filter(r => r.payback_years).map(r => r.payback_years));
+      h += `<tr><th>${pL([a, b])}</th><td>${arr.length || "—"}</td>` +
+        `<td class="${yld && allMedY && yld > allMedY ? "low" : ""}">${yld ? yld.toFixed(1) + "%" : "—"}</td>` +
+        `<td>${ppm ? Math.round(ppm).toLocaleString("ru-RU") + " ₽" : "—"}</td>` +
+        `<td>${rent ? Math.round(rent).toLocaleString("ru-RU") + " ₽" : "—"}</td>` +
+        `<td>${pb ? pb.toFixed(1) + " лет" : "—"}</td></tr>`;
+    }
+    return h + `</table><div class="hint">Зелёная доходность — выше средней по выборке (${allMedY?.toFixed(1)}%)</div>`;
+  })();
 
   // подорожавшие
   const riseList = ch.filter(c => c.pct > 0).sort((a,b) => b.pct - a.pct).slice(0, 3);
