@@ -124,6 +124,7 @@
   .addr { font-weight:600; font-size:14.5px; }
   .src { color:var(--muted); font-size:10.5px; white-space:nowrap; }
   .line2 { color:var(--muted); font-size:12px; margin-top:2px; }
+  .metro-m { color:var(--red); font-weight:700; margin-right:3px; }
   .nums { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px;
           font-variant-numeric:tabular-nums; }
   .nums div { background:var(--panel2); border-radius:8px; padding:6px 8px; font-size:12px; }
@@ -580,7 +581,7 @@ function renderGeo() {
   const mmax = Math.max(1, ...metro.map(m => m[1]));
   document.getElementById("geoMetro").innerHTML = metro.length
     ? metro.map(([s, n]) =>
-        `<div class="trow act" data-q="${esc(s)}"><div class="name">📍 ${esc(s)}</div>
+        `<div class="trow act" data-q="${esc(s)}"><div class="name"><span class="metro-m">М</span>${esc(s)}</div>
          <div class="bar"><i style="width:${Math.round(n/mmax*100)}%"></i><span>${n}</span></div></div>`).join("")
     : `<div class="hint">Нет данных по метро</div>`;
   document.querySelectorAll("#geoMetro .trow").forEach(el =>
@@ -630,7 +631,7 @@ function renderGeo() {
     .sort((a, b) => b.med - a.med).slice(0, 10);
   document.getElementById("aMetroYield2").innerHTML = mYield.length
     ? mYield.map(v =>
-        `<div class="trow"><div class="name">${esc(v.s)}</div>
+        `<div class="trow"><div class="name"><span class="metro-m">М</span>${esc(v.s)}</div>
            <div class="cnt">${v.med.toFixed(1)}% <span style="color:var(--muted);font-size:10px">(${v.n} шт)</span></div></div>`).join("")
       : `<div class="hint">Нет станций с ≥3 объектами и доходностью</div>`;
 }
@@ -860,8 +861,8 @@ function card(r) {
   return `<div class="card">
     <div class="top"><div class="addr">${esc(r.title || r.address || "—")}</div>
       <div class="src">${esc(r.source)} · ${esc((r.first_seen||"").slice(5,10))}</div></div>
-    ${r.title && r.address ? `<div class="line2">${esc(r.address)}</div>` : ""}
-    <div class="line2">📍 ${esc(r.metro || "метро не указано")} · ${r.area || "—"} м²${r.price_per_m2 ? " · " + Math.round(r.price_per_m2).toLocaleString("ru-RU") + " ₽/м²" : ""}${r.city && r.city !== "Москва" ? " · " + esc(r.city) : ""}</div>
+    ${r.title && r.address ? `<div class="line2">📍 ${esc(r.address)}</div>` : ""}
+    <div class="line2"><span class="metro-m">М</span>${esc(r.metro || "метро не указано")} · ${r.area || "—"} м²${r.price_per_m2 ? " · " + Math.round(r.price_per_m2).toLocaleString("ru-RU") + " ₽/м²" : ""}${r.city && r.city !== "Москва" ? " · " + esc(r.city) : ""}</div>
     <div class="nums">
       <div><span>Цена</span><b>${price}</b></div>
       <div><span>Аренда/мес</span><b>${rent} ₽</b></div>
