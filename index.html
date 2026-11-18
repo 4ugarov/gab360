@@ -257,7 +257,7 @@
         </div>
       </div>
       <div class="asec"><h4>Свежесть активных объявлений</h4><div id="mktFresh"></div></div>
-      <div class="asec"><h4>Публикации за 7 дней по источникам</h4><div id="aSrcNew2"></div></div>
+      <div class="asec"><h4>Обнаружено за 7 дней по источникам</h4><div id="aSrcNew2"></div></div>
       <div class="asec"><h4>Залежавшиеся: экспозиция ≥14 дней</h4><div class="scroll" id="aStale2"></div></div>
     </div>
     <div class="atabpane" data-pane="geo">
@@ -307,9 +307,15 @@ let state = { chip: "", src: "", yMin: "", q: "", price: "", area: "",
 let shown = 0;
 const PAGE = 30;
 
-const fmtM = v => v == null ? "—" : (v >= 1e6 ? (v/1e6).toFixed(v >= 3e7 ? 0 : 1) + " млн" :
+// единый десятичный разделитель «,» + млрд (раньше 24.12 млрд рисовалось «24120 млн»)
+const fmtM = v => v == null ? "—" : (v >= 1e9 ? (v / 1e9).toFixed(v >= 3e10 ? 0 : 1).replace(".", ",") + " млрд" :
+  v >= 1e6 ? (v / 1e6).toFixed(v >= 3e7 ? 0 : 1).replace(".", ",") + " млн" :
   Math.round(v).toLocaleString("ru-RU") + " ₽");
 const fmt = v => v == null ? "—" : v.toLocaleString("ru-RU");
+// склонение: plur(3, ["объявление","объявления","объявлений"])
+const plur = (n, [one, few, many]) =>
+  n % 10 === 1 && n % 100 !== 11 ? one :
+  ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) ? few : many;
 const esc = s => (s == null ? "" : String(s)).replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const isNew = r => r.first_seen >= DATA.new_cutoff && r.status === "active";
@@ -322,7 +328,13 @@ const pubDate = r => {
   if (p != null) {
     let d;
     if (typeof p === "number") d = new Date(p > 1e12 ? p : p * 1000);
-    else d = new Date(String(p).replace(" ", "T"));
+    else {
+      let s = String(p).replace(" ", "T");
+      // строка без зоны — считаем UTC (совпадает с эталоном в Python),
+      // источники теперь пишут смещение явно (migrate_tz.py)
+      if (!/[zZ]|[+-]\d\d:?\d\d$/.test(s)) s += "Z";
+      d = new Date(s);
+    }
     if (d && !isNaN(d.getTime())) return d;
   }
   return r.first_seen ? new Date(r.first_seen) : null;
@@ -569,7 +581,8 @@ function renderMarket() {
   netEl.textContent = (net >= 0 ? "+" : "−") + Math.abs(net);
   netEl.style.color = net > 0 ? "var(--green)" : (net < 0 ? "var(--red)" : "var(--text)");
 
-  // публикации за 7 дней по источникам
+  // обнаружено за 7 дней по источникам (для источников без даты публикации —
+  // дата первого обнаружения нами, включая массовые импорты)
   const snmap = {};
   act.filter(r => in7(r.first_seen)).forEach(r => { snmap[r.source] = (snmap[r.source]||0)+1; });
   const snew = Object.entries(snmap).sort((a,b) => b[1]-a[1]);
@@ -577,8 +590,9 @@ function renderMarket() {
   document.getElementById("aSrcNew2").innerHTML = snew.length
     ? snew.map(([s, n]) =>
         `<div class="trow"><div class="name">${esc(s)}</div>
-           <div class="bar"><i style="width:${Math.round(n/snmax*100)}%"></i><span>${n}</span></div></div>`).join("")
-      : `<div class="hint">За 7 дней публикаций не было</div>`;
+           <div class="bar"><i style="width:${Math.round(n/snmax*100)}%"></i><span>${n}</span></div></div>`).join("") +
+      `<div class="hint">по дате публикации; где её нет — по дате первого обнаружения нами</div>`
+      : `<div class="hint">За 7 дней новых объектов не было</div>`;
 
   // залежавшиеся
   const stale = act.filter(r => pubDate(r) &&
@@ -589,7 +603,7 @@ function renderMarket() {
         const days = Math.round((Date.now() - pubDate(r).getTime()) / 864e5);
         return `<div class="trow"><div class="name" style="white-space:normal">
            <a href="${esc(r.url || "#")}" target="_blank" style="color:var(--accent);text-decoration:none">${esc((r.address || r.title || "").slice(0, 42))}</a>
-           <div class="hint">${days} дней на рынке · ${fmtM(r.price)} · ${r.source}${r.yield_pct ? " · " + r.yield_pct.toFixed(1) + "%" : ""}</div>
+           <div class="hint">${days} ${plur(days, ["день", "дня", "дней"])} на рынке · ${fmtM(r.price)} · ${r.source}${r.yield_pct ? " · " + r.yield_pct.toFixed(1) + "%" : ""}</div>
          </div></div>`;
       }).join("")
       : `<div class="hint">Объектов с экспозицией ≥14 дней пока нет</div>`;
@@ -691,15 +705,19 @@ function renderPrices() {
     const pct = c.old_price ? (c.new_price - c.old_price) / c.old_price * 100 : 0;
     return { ...c, pct };
   });
-  const drops = ch.filter(c => c.pct < 0).sort((a,b) => a.pct - b.pct).slice(0, 6);
+  // средняя дельта падений — по ВСЕМ падениям окна, не по показанному срезу
+  const allDrops = ch.filter(c => c.pct < 0);
+  const drops = [...allDrops].sort((a,b) => a.pct - b.pct).slice(0, 6);
   const rises = ch.filter(c => c.pct > 0).length;
+  const avgDrop = allDrops.length ? allDrops.reduce((a, c) => a + c.pct, 0) / allDrops.length : null;
   document.getElementById("prDrops").innerHTML = drops.length
     ? drops.map(c =>
         `<div class="drop"><a href="${esc(c.url || "#")}" target="_blank" rel="noopener">
            <div class="a">${esc(c.address || "объект")} <span class="src">${esc(c.source)}</span></div>
            <div class="p">${fmtM(c.old_price)} → ${fmtM(c.new_price)} (${c.pct.toFixed(1)}%)</div>
            <div class="d">${msk(c.ts)} МСК · подорожавших за 14 дней: ${rises}</div>
-         </a></div>`).join("")
+         </a></div>`).join("") +
+      (avgDrop != null ? `<div class="hint">среднее падение: ${avgDrop.toFixed(1)}% · падений ${allDrops.length} · подорожавших ${rises}</div>` : "")
     : `<div class="hint">За 14 дней изменений цен не зафиксировано</div>`;
 
   // ₽/м² по размерам с шагом 50 — компактная таблица 5 колонок
@@ -755,9 +773,7 @@ function renderPrices() {
 
   // подорожавшие
   const riseList = ch.filter(c => c.pct > 0).sort((a,b) => b.pct - a.pct).slice(0, 3);
-  const avgDrop = drops.length ? drops.reduce((a, c) => a + c.pct, 0) / drops.length : null;
   document.getElementById("aRises2").innerHTML =
-    (avgDrop != null ? `<div class="hint">Средняя дельта падений: ${avgDrop.toFixed(1)}%</div>` : "") +
     (riseList.length
       ? riseList.map(c =>
           `<div class="drop"><div class="a" style="color:var(--green)">${esc((c.address || "объект").slice(0, 45))}</div>
@@ -775,20 +791,25 @@ function renderPrices() {
   for (let ai = 0; ai < 4; ai++) {
     heat += `<tr><th>${aL[ai]}</th>`;
     for (let pi = 0; pi < 4; pi++) {
-      const ys = act.filter(r => r.area != null && r.area >= aB[ai][0] &&
+      const inCell = act.filter(r => r.area != null && r.area >= aB[ai][0] &&
         (aB[ai][1] === Infinity || r.area < aB[ai][1]) &&
         r.price != null && r.price >= pB[pi][0] &&
-        (pB[pi][1] === Infinity || r.price < pB[pi][1]) && r.yield_pct)
-        .map(r => r.yield_pct);
+        (pB[pi][1] === Infinity || r.price < pB[pi][1]));
+      // медиана только по объектам с арендой; счётчик N/M — доля с арендой
+      const ys = inCell.filter(r => r.yield_pct).map(r => r.yield_pct);
       const med = median(ys);
-      if (med == null) { heat += `<td class="na">—</td>`; continue; }
+      if (inCell.length === 0) { heat += `<td class="na">—</td>`; continue; }
+      if (med == null) {
+        heat += `<td class="na" title="объектов: ${inCell.length}, с арендой: 0">—<br><span class="src">0/${inCell.length} шт</span></td>`;
+        continue;
+      }
       const cls = allMed && med > allMed * 1.1 ? "low" :
                   (allMed && med < allMed * 0.9 ? "hi" : "");
-      heat += `<td class="${cls}" title="${ys.length} шт"><b>${med.toFixed(1)}%</b><br><span class="src">${ys.length} шт</span></td>`;
+      heat += `<td class="${cls}" title="объектов: ${inCell.length}, с арендой (для доходности): ${ys.length}"><b>${med.toFixed(1)}%</b><br><span class="src">${ys.length}/${inCell.length} шт</span></td>`;
     }
     heat += "</tr>";
   }
-  heat += `</table><div class="hint">Зелёное — доходность выше средней на 10%+ · жёлтое — ниже</div>`;
+  heat += `</table><div class="hint">Зелёное — доходность выше средней на 10%+ · жёлтое — ниже · счётчик N/M — с арендой из всех в ячейке</div>`;
   document.getElementById("aHeat2").innerHTML = heat;
 
   // выбросы ₽/м²
@@ -806,7 +827,13 @@ function renderPrices() {
     const i = segIndex(r);
     return i >= 0 && segMed[i] && r.price_per_m2 < segMed[i] * 0.7;
   }).sort((a,b) => (a.price_per_m2||0) - (b.price_per_m2||0)).slice(0, 8);
-  document.getElementById("aOut2").innerHTML = outliers.length
+  // выбросы ВВЕРХ: ₽/м² втрое выше медианы сегмента — почти всегда ошибка источника
+  const upOutliers = act.filter(r => {
+    if (!r.price_per_m2) return false;
+    const i = segIndex(r);
+    return i >= 0 && segMed[i] && r.price_per_m2 > segMed[i] * 3;
+  }).sort((a,b) => (b.price_per_m2||0) - (a.price_per_m2||0)).slice(0, 5);
+  document.getElementById("aOut2").innerHTML = (outliers.length
     ? outliers.map(r => {
         const i = segIndex(r);
         const med = i >= 0 ? segMed[i] : null;
@@ -815,17 +842,37 @@ function renderPrices() {
            <div class="hint">${fmtM(r.price)} · ${r.area || "—"} м² · ${fmt(r.price_per_m2)} ₽/м² (медиана сегмента ${fmt(med || 0)} ₽) · ${r.yield_pct ? r.yield_pct.toFixed(1) + "%" : "—"}</div>
          </div></div>`;
       }).join("")
-      : `<div class="hint">Выбросов не найдено</div>`;
+      : `<div class="hint">Выбросов вниз не найдено</div>`) +
+    (upOutliers.length
+      ? `<div class="hint" style="margin-top:6px">сильно дороже медианы (×3+) — обычно ошибка источника:</div>` +
+        upOutliers.map(r => {
+        const i = segIndex(r);
+        const med = i >= 0 ? segMed[i] : null;
+        return `<div class="trow"><div class="name" style="white-space:normal">
+           <a href="${esc(r.url || "#")}" target="_blank" style="color:var(--red);text-decoration:none">${esc((r.address || r.title || "").slice(0, 48))}</a>
+           <div class="hint">${fmtM(r.price)} · ${r.area || "—"} м² · ${fmt(r.price_per_m2)} ₽/м² (медиана сегмента ${fmt(med || 0)} ₽)</div>
+         </div></div>`;
+      }).join("")
+      : "");
 
   // расхождения заявка/расчёт (глобально)
   const gapRows = DATA.listings.filter(r => r.yield_gap_pp != null && Math.abs(r.yield_gap_pp) > 1)
     .sort((a,b) => Math.abs(b.yield_gap_pp) - Math.abs(a.yield_gap_pp)).slice(0, 8);
   document.getElementById("aGap2").innerHTML = gapRows.length
-    ? gapRows.map(r =>
-        `<div class="trow"><div class="name" style="white-space:normal">
+    ? gapRows.map(r => {
+        // продавец заявил только окупаемость — разница от 100/окупаемость,
+        // показываем это явно (иначе «заявлено —%» с разницей выглядит багом)
+        const claimed = r.seller_yield_pct != null
+          ? r.seller_yield_pct.toFixed(1) + "%"
+          : (r.seller_payback_years
+            ? (100 / r.seller_payback_years).toFixed(1).replace(".", ",") +
+              "% (из окупаемости " + String(r.seller_payback_years).replace(".", ",") + " л.)"
+            : "—");
+        return `<div class="trow"><div class="name" style="white-space:normal">
            <a href="${esc(r.url || "#")}" target="_blank" style="color:var(--accent);text-decoration:none">${esc((r.address || r.title || "").slice(0, 45))}</a>
-           <div class="hint">заявлено ${r.seller_yield_pct?.toFixed(1) ?? "—"}% · расчёт ${(r.yield_pct || 0).toFixed(1)}% · разница ${r.yield_gap_pp > 0 ? "+" : ""}${r.yield_gap_pp.toFixed(1)} п.п.</div>
-         </div></div>`).join("")
+           <div class="hint">заявлено ${claimed} · расчёт ${(r.yield_pct || 0).toFixed(1)}% · разница ${r.yield_gap_pp > 0 ? "+" : ""}${r.yield_gap_pp.toFixed(1)} п.п.</div>
+         </div></div>`;
+      }).join("")
       : `<div class="hint">Расхождений >1 п.п. нет</div>`;
 }
 
@@ -838,8 +885,12 @@ function renderDups() {
     if (!groups[r.dedup_group]) groups[r.dedup_group] = [];
     groups[r.dedup_group].push(r);
   });
-  const dups = Object.entries(groups)
-    .filter(([g, arr]) => arr.length >= 2)
+  // Панель про «между брокерами» — только группы с ≥2 источниками:
+  // группы одного источника — чаще повторные объявления или разные лоты.
+  const allDupGroups = Object.entries(groups)
+    .filter(([g, arr]) => arr.length >= 2);
+  const dups = allDupGroups
+    .filter(([g, arr]) => new Set(arr.map(r => r.source)).size >= 2)
     .map(([g, arr]) => {
       const priced = arr.filter(r => r.price).sort((a, b) => a.price - b.price);
       const lo = priced.length ? priced[0] : arr[0];
@@ -872,12 +923,13 @@ function renderDups() {
         return `<div class="trow act" data-g="${esc(d.g)}" style="align-items:flex-start">
            <div style="flex:1;min-width:0">
              <div class="name" style="white-space:normal">${esc(d.addr)}</div>
-             <div class="hint">разница ${d.pct}% · ${d.arr.length} объявления</div>
+             <div class="hint">разница ${d.pct}% · ${d.arr.length} ${plur(d.arr.length, ["объявление","объявления","объявлений"])}</div>
              ${sides}
            </div>
            <button class="dup-copy" data-copy="${esc(d.copyText())}">скопировать</button>
          </div>`;
-      }).join("")
+      }).join("") +
+      `<div class="hint">межброкерных групп: ${dups.length} из ${allDupGroups.length} · группы одного источника — чаще повторные объявления или разные лоты одного здания</div>`
       : `<div class="hint">Дублей между брокерами пока не найдено</div>`;
   document.querySelectorAll("#dupList .trow").forEach(el =>
     el.addEventListener("click", (e) => {
