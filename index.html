@@ -278,6 +278,7 @@
     </div>
     <div class="atabpane" data-pane="dups">
       <div class="ana-note">Один объект у разных брокеров — разница цен как аргумент торга</div>
+      <div class="asec"><h4>Уникальные объекты и перекрытие источников</h4><div id="aUnique2"></div></div>
       <div class="asec"><h4>Дубли с наибольшей разницей цен</h4><div id="dupList"></div></div>
       <div class="asec"><h4>Концентрация арендаторов</h4><div id="dupConc"></div></div>
     </div>
@@ -319,6 +320,30 @@ const plur = (n, [one, few, many]) =>
 const esc = s => (s == null ? "" : String(s)).replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const isNew = r => r.first_seen >= DATA.new_cutoff && r.status === "active";
+
+// Уникальные объекты: из payload (Python objects_stats — общая логика с десктопом);
+// при старом payload — локальный пересчёт из dedup_group как приближение.
+function objectsStats() {
+  if (DATA.objects_stats) return DATA.objects_stats;
+  const act = DATA.listings.filter(r => r.status === "active");
+  const g = {};
+  act.forEach(r => { const k = r.dedup_group || "__solo_" + r.id; (g[k] = g[k] || []).push(r); });
+  const clusters = Object.values(g);
+  const bySrc = {}, solo = {}, pairs = {};
+  let multi = 0;
+  clusters.forEach(arr => {
+    const srcs = [...new Set(arr.map(r => r.source))].sort();
+    bySrc[Math.min(srcs.length, 4)] = (bySrc[Math.min(srcs.length, 4)] || 0) + 1;
+    if (srcs.length === 1) solo[srcs[0]] = (solo[srcs[0]] || 0) + 1; else multi++;
+    for (let i = 0; i < srcs.length; i++)
+      for (let j = i + 1; j < srcs.length; j++)
+        pairs[srcs[i] + "|" + srcs[j]] = (pairs[srcs[i] + "|" + srcs[j]] || 0) + 1;
+  });
+  return { listings: act.length, unique: clusters.length, duplicates: act.length - clusters.length,
+           multi_source: multi, clusters_by_sources: bySrc, solo_by_source: solo,
+           top_overlaps: Object.entries(pairs).sort((a, b) => b[1] - a[1]).slice(0, 6)
+             .map(([k, n]) => ({ pair: k.split("|"), n })), low_confidence: null };
+}
 const inMSK = iso => iso ? new Date(new Date(iso).getTime() + MSK_H*3600e3) : null;
 const mskDay = iso => { const d = inMSK(iso); return d ? d.toISOString().slice(0,10) : null; };
 // Дата «жизни» объекта: публикации у источника, если есть, иначе дата
@@ -436,7 +461,9 @@ function renderOverview(rows) {
     [medPb ? medPb.toFixed(1) + " лет" : "—", "медианная окупаемость"],
   ].map(([v,t]) => `<div><b>${v}</b><span>${t}</span></div>`).join("");
   document.getElementById("anaTiles2").innerHTML = [
-    [act.length, "объектов в выборке"],
+    [act.length, "объявлений"],
+    [objectsStats().unique, "уникальных объектов"],
+    [objectsStats().duplicates, "повторных объявлений"],
     [act.filter(r => r.anchor_tenant).length, "якорных"],
     [new Set(act.filter(r => r.tenant).map(r => r.tenant)).size, "сетей/брендов"],
     [act.filter(r => r.rent_derived).length, "аренда расчётная"],
@@ -879,6 +906,24 @@ function renderPrices() {
 // ---------- Дубли + концентрация ----------
 function renderDups() {
   const act = DATA.listings.filter(r => r.status === "active");
+
+  // Уникальные объекты и перекрытие источников
+  const uStats = objectsStats();
+  const srcL = { 1: "в 1 источнике", 2: "в 2 источниках", 3: "в 3 источниках", 4: "в 4+ источниках" };
+  const uniRows = Object.entries(uStats.clusters_by_sources).map(([k, n]) => [srcL[k] || k, n]);
+  const uMax = Math.max(1, ...uniRows.map(r => r[1]));
+  document.getElementById("aUnique2").innerHTML = uniRows.map(([t, n]) =>
+    `<div class="trow"><div class="name">${t}</div>
+       <div class="bar"><i style="width:${Math.round(n/uMax*100)}%"></i><span>${n}</span></div></div>`).join("") +
+    `<div class="hint">объявлений: ${uStats.listings} · уникальных: <b>${uStats.unique}</b> · ` +
+    `повторных объявлений: ${uStats.duplicates} · объектов в ≥2 источниках: ${uStats.multi_source}</div>` +
+    (uStats.top_overlaps && uStats.top_overlaps.length
+      ? `<div class="hint">перекрытия: ` +
+        uStats.top_overlaps.map(o => `${o.pair[0]} ∩ ${o.pair[1]} — ${o.n}`).join(" · ") + `</div>` : "") +
+    (uStats.low_confidence != null
+      ? `<div class="hint">кандидатов «возможно разные лоты» (разброс цен &gt;20%): ${uStats.low_confidence} ` +
+        `— дедуп по адресу+площади не различает лоты одного здания</div>` : "");
+
   const groups = {};
   act.forEach(r => {
     if (!r.dedup_group) return;
