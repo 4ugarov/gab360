@@ -725,7 +725,7 @@ function renderPrices() {
   const sLabel = ([a, b]) => a === 0 ? "до " + b + " м²" :
     (b === Infinity ? "от " + a + " м²" : a + "–" + b + " м²");
   document.getElementById("prSize").innerHTML = (() => {
-    const fmtK = v => v == null ? "—" : (v >= 1e6 ? (v / 1e6).toFixed(2) + " млн"
+    const fmtK = v => v == null ? "—" : (v >= 1e6 ? (v / 1e6).toFixed(2).replace(".", ",") + " млн"
       : (v >= 1e3 ? Math.round(v / 1e3) + " тыс" : Math.round(v)));
     let h = `<table class="heat"><tr><th>Размер</th><th>Цена</th>` +
       `<th>₽/м²</th><th>Дох.</th><th>Окуп.</th></tr>`;
@@ -751,7 +751,7 @@ function renderPrices() {
     (b === Infinity ? "от " + a + " млн" : a + "–" + b + " млн");
   const allMedY = median(act.filter(r => r.yield_pct).map(r => r.yield_pct));
   document.getElementById("prMatrix").innerHTML = (() => {
-    const fmtK = v => v == null ? "—" : (v >= 1e6 ? (v / 1e6).toFixed(2) + " млн"
+    const fmtK = v => v == null ? "—" : (v >= 1e6 ? (v / 1e6).toFixed(2).replace(".", ",") + " млн"
       : (v >= 1e3 ? Math.round(v / 1e3) + " тыс" : Math.round(v)));
     let h = `<table class="heat"><tr><th>Сегмент</th><th>Дох.</th>` +
       `<th>₽/м²</th><th>Аренда</th><th>Окуп.</th></tr>`;
