@@ -124,7 +124,12 @@
   .addr { font-weight:600; font-size:14.5px; }
   .src { color:var(--muted); font-size:10.5px; white-space:nowrap; }
   .line2 { color:var(--muted); font-size:12px; margin-top:2px; }
-  .metro-m { color:var(--red); font-weight:700; margin-right:3px; }
+  /* Значок метро: белая «М» в красном круге */
+  .metro-m { display:inline-flex; align-items:center; justify-content:center;
+             width:15px; height:15px; border-radius:50%;
+             background:var(--red); color:#fff; font-size:10px; font-weight:700;
+             line-height:1; margin-right:5px; vertical-align:-2px;
+             font-family:Arial, "Segoe UI", sans-serif; flex:0 0 auto; }
   .nums { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px;
           font-variant-numeric:tabular-nums; }
   .nums div { background:var(--panel2); border-radius:8px; padding:6px 8px; font-size:12px; }
