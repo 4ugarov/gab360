@@ -858,8 +858,9 @@ function card(r) {
   if (r.yield_gap_pp != null && Math.abs(r.yield_gap_pp) > 1)
     badges.push(`<span class="badge b-warn">расхождение ${r.yield_gap_pp>0?"+":""}${r.yield_gap_pp} п.п.</span>`);
   return `<div class="card">
-    <div class="top"><div class="addr">${esc(r.address || r.title || "—")}</div>
+    <div class="top"><div class="addr">${esc(r.title || r.address || "—")}</div>
       <div class="src">${esc(r.source)} · ${esc((r.first_seen||"").slice(5,10))}</div></div>
+    ${r.title && r.address ? `<div class="line2">${esc(r.address)}</div>` : ""}
     <div class="line2">📍 ${esc(r.metro || "метро не указано")} · ${r.area || "—"} м²${r.price_per_m2 ? " · " + Math.round(r.price_per_m2).toLocaleString("ru-RU") + " ₽/м²" : ""}${r.city && r.city !== "Москва" ? " · " + esc(r.city) : ""}</div>
     <div class="nums">
       <div><span>Цена</span><b>${price}</b></div>
