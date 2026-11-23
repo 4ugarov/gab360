@@ -77,6 +77,11 @@
                font-variant-numeric:tabular-nums; }
   .trow.act { cursor:pointer; }
   .trow.act .name { color:var(--accent); }
+  /* активная строка — фильтр, включённый тапом по аналитике; повторный тап снимает */
+  .trow.on { background: rgba(58,163,255,.13); box-shadow: inset 3px 0 0 var(--accent);
+             padding-left: 8px; margin-left: -4px; border-radius: 4px; }
+  .trow.on .name { color:var(--accent); font-weight: 600; }
+  .trow.on .bar i { opacity: 1; }
   .bar { position:relative; flex:0 0 90px; height:14px; background:var(--panel2);
          border-radius:5px; overflow:hidden; }
   .bar i { position:absolute; inset:0 auto 0 0; background:var(--accent);
@@ -304,7 +309,7 @@ const CHIPS = [
 ];
 let DATA = { listings: [], price_changes: [], generated_at: "", new_cutoff: "" };
 let state = { chip: "", src: "", yMin: "", q: "", price: "", area: "",
-              tenant: "", dup: "" };
+              tenant: "", seg: null, dup: "" };
 let shown = 0;
 const PAGE = 30;
 
@@ -393,7 +398,58 @@ function renderStats() {
   document.getElementById("upd").textContent = "обновлено " + msk(DATA.generated_at);
 }
 
-function filtered() {
+// ---------- фильтры, включаемые тапом по строке аналитики ----------
+const SEGS_FINE = [
+  ["до 20 млн", 0, 20], ["20–50 млн", 20, 50], ["50–100 млн", 50, 100],
+  ["100–150 млн", 100, 150], ["150–200 млн", 150, 200], ["200–250 млн", 200, 250],
+  ["250–300 млн", 250, 300], ["300–350 млн", 300, 350], ["350–400 млн", 350, 400],
+  ["400–500 млн", 400, 500], ["500–600 млн", 500, 600], ["от 600 млн", 600, Infinity],
+];
+
+// state.seg — индекс сегмента в SEGS_FINE (или null). Пресеты списка «Цена»
+// включают верхнюю границу, а панель — нет, поэтому сегмент считается отдельно:
+// так число строк списка совпадает с числом в панели.
+function setSegmentFilter(i) {
+  state.seg = i;
+  state.price = "";                       // сегмент и пресет цены не смешиваются
+  const sel = document.getElementById("fPrice");
+  sel.querySelector("option[data-exact]")?.remove();
+  if (i == null) { sel.value = ""; return; }
+  const opt = document.createElement("option");
+  opt.dataset.exact = "1";
+  opt.value = "seg";
+  opt.textContent = "Цена: " + SEGS_FINE[i][0];
+  sel.appendChild(opt);
+  sel.value = "seg";
+}
+
+function setTenantTap(name) {
+  const sel = document.getElementById("fTenant");
+  sel.querySelector("option[data-exact]")?.remove();
+  state.tenant = name;
+  // отдельный пункт без счётчика: у готовых пунктов списка число общее по базе
+  // (например, «(91)»), а под фильтром по цене объектов меньше. Значение с
+  // префиксом — иначе при совпадении значений список выберет готовый пункт.
+  if (!name) { sel.value = ""; return; }
+  const opt = document.createElement("option");
+  opt.dataset.exact = "1";
+  opt.value = "tap:" + name;
+  opt.textContent = name;
+  sel.appendChild(opt);
+  sel.value = opt.value;
+}
+
+function afterAnaFilter() {
+  // аналитика сворачивается, чтобы отфильтрованный список был сразу на экране
+  const ana = document.getElementById("ana");
+  ana.classList.add("closed");
+  const head = document.querySelector("header");
+  window.scrollTo({ top: Math.max(0, ana.offsetTop - head.offsetHeight - 8), behavior: "smooth" });
+}
+
+// skip = "tenant" | "seg": панель аналитики считает выборку без собственного
+// фильтра — список не сжимается до одной строки, переключение — одним тапом
+function filtered(skip) {
   const q = state.q.toLowerCase();
   if (state.dup) {
     return DATA.listings.filter(r => r.status === "active"
@@ -408,11 +464,17 @@ function filtered() {
     if (state.chip !== "removed" && r.status !== "active") return false;
     if (state.src && r.source !== state.src) return false;
     if (state.yMin && (r.yield_pct == null || r.yield_pct < +state.yMin)) return false;
-    if (state.tenant && (r.tenant || "") !== state.tenant) return false;
+    if (state.tenant && skip !== "tenant" && (r.tenant || "") !== state.tenant) return false;
+    if (state.seg != null && skip !== "seg") {
+      const a = SEGS_FINE[state.seg][1], b = SEGS_FINE[state.seg][2];
+      if (r.price == null || r.price < a * 1e6 || (b !== Infinity && r.price >= b * 1e6)) return false;
+    }
     if (state.price) {
       const [a, b] = state.price.split("-").map(Number);
       if (r.price == null) return false;
-      if (b === 0 ? r.price < a * 1e6 : !(r.price >= a*1e6 && r.price <= b*1e6)) return false;
+      // верхняя граница исключена — как в панели «Ценовые сегменты», иначе
+      // пресет «50–100 млн» и сегмент «50–100 млн» давали разные числа
+      if (b === 0 ? r.price < a * 1e6 : !(r.price >= a * 1e6 && r.price < b * 1e6)) return false;
     }
     if (state.area) {
       const [a, b] = state.area.split("-").map(Number);
@@ -469,30 +531,34 @@ function renderOverview(rows) {
     [act.filter(r => r.rent_derived).length, "аренда расчётная"],
   ].map(([v,t]) => `<div><b>${v}</b><span>${t}</span></div>`).join("");
 
+  // панели-фильтры считают выборку без собственного фильтра — списки остаются полными
+  const actT = (state.tenant ? filtered("tenant") : rows).filter(r => r.status === "active");
+  const actS = (state.seg != null ? filtered("seg") : rows).filter(r => r.status === "active");
   const tmap = {};
-  act.forEach(r => { if (r.tenant) tmap[r.tenant] = (tmap[r.tenant]||0)+1; });
+  actT.forEach(r => { if (r.tenant) tmap[r.tenant] = (tmap[r.tenant]||0)+1; });
   const tAll = Object.entries(tmap).sort((a,b) => b[1]-a[1]);
   const top = tAll.slice(0, 15);
   const tmax = top.length ? top[0][1] : 1;
   document.getElementById("anaTenants").innerHTML = top.length
     ? top.map(([name, n]) =>
-        `<div class="trow act" data-t="${esc(name)}">
+        `<div class="trow act${state.tenant === name ? " on" : ""}" data-t="${esc(name)}">
            <div class="name">${esc(name)}</div>
            <div class="bar m"><i style="width:${Math.round(n/tmax*100)}%"></i><span>${n}</span></div>
          </div>`).join("")
       : `<div class="hint">В выборке нет объектов с указанным арендатором</div>`;
   document.getElementById("aTenAll2").innerHTML = tAll.length
     ? tAll.map(([name, n]) =>
-        `<div class="trow act" data-t="${esc(name)}">
+        `<div class="trow act${state.tenant === name ? " on" : ""}" data-t="${esc(name)}">
            <div class="name">${esc(name)}</div>
            <div class="bar"><i style="width:${Math.round(n/tAll[0][1]*100)}%"></i><span>${n}</span></div>
          </div>`).join("")
       : `<div class="hint">—</div>`;
   document.querySelectorAll("#anaTenants .trow, #aTenAll2 .trow").forEach(el =>
     el.addEventListener("click", () => {
-      state.tenant = el.dataset.t;
-      document.getElementById("fTenant").value = state.tenant;
+      // повторный тап по активной сети снимает фильтр
+      setTenantTap(state.tenant === el.dataset.t ? "" : el.dataset.t);
       refresh(true);
+      afterAnaFilter();
     }));
 
   // полнота данных по источникам
@@ -513,21 +579,25 @@ function renderOverview(rows) {
   // Детальная лестница: до 100 млн шаг 50, выше — 50 млн.
   // Отдельный массив от сегментов выбросов (segRanges ниже): там 4 широких
   // диапазона, потому что медиана в узких сегментах нестабильна.
-  const segsFine = [
-    ["до 20 млн", 0, 20], ["20–50 млн", 20, 50], ["50–100 млн", 50, 100],
-    ["100–150 млн", 100, 150], ["150–200 млн", 150, 200], ["200–250 млн", 200, 250],
-    ["250–300 млн", 250, 300], ["300–350 млн", 300, 350], ["350–400 млн", 350, 400],
-    ["400–500 млн", 400, 500], ["500–600 млн", 500, 600], ["от 600 млн", 600, Infinity],
-  ];
-  const segCount = ([, a, b]) => act.filter(r => r.price != null &&
+  // сегменты — общий список SEGS_FINE (по ним же работает фильтр по тапу)
+  const segCount = ([, a, b]) => actS.filter(r => r.price != null &&
     r.price >= a * 1e6 && (b === Infinity || r.price < b * 1e6)).length;
-  const scounts = segsFine.map(sg => [sg[0], segCount(sg)]);
+  const scounts = SEGS_FINE.map(sg => [sg[0], segCount(sg)]);
   const smax = Math.max(1, ...scounts.map(s => s[1]));
-  document.getElementById("anaPrice").innerHTML = scounts.map(([t, n]) =>
-    `<div class="trow"><div class="name">${t}</div>
+  document.getElementById("anaPrice").innerHTML = scounts.map(([t, n], i) =>
+    `<div class="trow act${state.seg === i ? " on" : ""}" data-seg="${i}">
+       <div class="name">${t}</div>
        <div class="bar"><i style="width:${Math.round(n/smax*100)}%"></i><span>${n}</span></div>
      </div>`).join("") +
-    `<div class="hint">всего с ценой: ${scounts.reduce((a, [, n]) => a + n, 0)} из ${act.length}</div>`;
+    `<div class="hint">тап по строке — объекты этого диапазона в списке, повторный тап — снять · ` +
+    `всего с ценой: ${scounts.reduce((a, [, n]) => a + n, 0)} из ${actS.length}</div>`;
+  document.querySelectorAll("#anaPrice .trow").forEach(el =>
+    el.addEventListener("click", () => {
+      const i = +el.dataset.seg;
+      setSegmentFilter(state.seg === i ? null : i);
+      refresh(true);
+      afterAnaFilter();
+    }));
 
   const smap = {};
   act.forEach(r => { smap[r.source] = (smap[r.source]||0)+1; });
@@ -1174,13 +1244,20 @@ document.getElementById("fYield").addEventListener("change", e => {
   state.yMin = e.target.value; renderList(true);
 });
 document.getElementById("fPrice").addEventListener("change", e => {
-  state.price = e.target.value; renderList(true);
+  state.price = e.target.value;
+  // выбран другой пункт списка — сегмент из аналитики больше не действует
+  if (state.price !== "seg") { state.seg = null; e.target.querySelector("option[data-exact]")?.remove(); }
+  renderList(true);
 });
 document.getElementById("fArea").addEventListener("change", e => {
   state.area = e.target.value; renderList(true);
 });
 document.getElementById("fTenant").addEventListener("change", e => {
-  state.tenant = e.target.value; renderList(true);
+  state.tenant = e.target.value.replace(/^tap:/, "");
+  // выбран другой пункт — пункт, добавленный тапом по аналитике, убираем
+  const exact = e.target.querySelector("option[data-exact]");
+  if (exact && exact.value !== e.target.value) exact.remove();
+  renderList(true);
 });
 document.getElementById("more").addEventListener("click", () => renderList(false));
 document.getElementById("anaHead").addEventListener("click", () =>
