@@ -324,7 +324,9 @@ const plur = (n, [one, few, many]) =>
   ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) ? few : many;
 const esc = s => (s == null ? "" : String(s)).replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const isNew = r => r.first_seen >= DATA.new_cutoff && r.status === "active";
+// «Новое» = появилось на рынке. Пополнение базы (backfill: первый сбор,
+// расширение раздела) новым не считается.
+const isNew = r => r.first_seen >= DATA.new_cutoff && r.status === "active" && !r.backfill;
 
 // Уникальные объекты: из payload (Python objects_stats — общая логика с десктопом);
 // при старом payload — локальный пересчёт из dedup_group как приближение.
@@ -385,13 +387,19 @@ function median(arr) {
 
 function renderStats() {
   const act = DATA.listings.filter(r => r.status === "active");
-  const ys = act.filter(r => r.yield_pct).map(r => r.yield_pct);
-  const avg = ys.length ? (ys.reduce((a,b)=>a+b)/ys.length).toFixed(1) : "—";
+  // доходность двумя числами: по фактической ставке аренды и по заявленной
+  // продавцом окупаемости (rent_derived) — усреднять их вместе нельзя
+  const real = act.filter(r => r.yield_pct && !r.rent_derived).map(r => r.yield_pct);
+  const der = act.filter(r => r.yield_pct && r.rent_derived).map(r => r.yield_pct);
+  const mean = a => a.length ? (a.reduce((x, y) => x + y, 0) / a.length).toFixed(1).replace(".", ",") : null;
+  const avgReal = mean(real), avgDer = mean(der);
+  const yLabel = "доходность" +
+    (avgReal && avgDer ? `<small class="stat-sub" style="display:block">по ставке · по окупаемости ${avgDer}%</small>` : "");
   const boxes = [
     ["", act.length, "в базе"],
     ["g", act.filter(isNew).length, "новых"],
     ["", act.filter(r => r.anchor_tenant).length, "якорных"],
-    ["y", avg + "%", "ср. доходность"],
+    ["y", (avgReal || avgDer || "—") + "%", yLabel],
   ];
   document.getElementById("stats").innerHTML = boxes.map(([c,v,t]) =>
     `<div class="stat ${c}"><b>${v}</b><span>${t}</span></div>`).join("");
@@ -1169,8 +1177,14 @@ async function decryptPayload(blobText, password) {
   const key = await crypto.subtle.deriveKey(
     { name: "PBKDF2", salt: b64buf(d.salt), iterations: d.iters, hash: "SHA-256" },
     keyMat, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
-  const plain = await crypto.subtle.decrypt(
+  let plain = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: b64buf(d.nonce) }, key, b64buf(d.ct));
+  if (d.z === "gzip") {
+    // данные сжаты до шифрования (файл в ~8 раз меньше); файлы версии 1 — без сжатия
+    if (typeof DecompressionStream === "undefined") { const e = new Error("oldBrowser"); throw e; }
+    plain = await new Response(
+      new Blob([plain]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+  }
   return new TextDecoder().decode(plain);
 }
 const b64buf = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
@@ -1190,6 +1204,11 @@ async function load() {
         DATA = JSON.parse(plain);
         break;
       } catch (e) {
+        if (e && e.message === "oldBrowser") {
+          gateErr.textContent = "Браузер не умеет распаковывать данные — обновите его " +
+            "(Chrome 80+, Safari 16.4+, Firefox 113+)";
+          throw e;                          // повторный ввод пароля не поможет
+        }
         localStorage.removeItem("gab360pw");
         gateErr.textContent = "Неверный пароль — попробуйте ещё раз";
       }
@@ -1210,6 +1229,13 @@ async function load() {
     `<option value="">Арендатор: все</option>` +
     t15.map(([t, n]) => `<option value="${esc(t)}">${esc(t)} (${n})</option>`).join("");
   renderStats();
+  // источник не собран в последнем прогоне — данные по нему устарели
+  // (после renderStats: он переписывает ту же строку «обновлено …»)
+  const h = DATA.health;
+  if (h && h.ok === false && h.failed && h.failed.length) {
+    const upd = document.getElementById("upd");
+    if (upd) upd.textContent += " · не собрано: " + h.failed.map(f => f.source).join(", ");
+  }
   renderList(true);
   document.getElementById("foot").textContent =
     `объектов в базе: ${DATA.listings.length} · данные из открытых источников`;
@@ -1220,7 +1246,6 @@ function askPassword() {
     const input = document.getElementById("pw");
     const btn = document.getElementById("go");
     input.value = "";
-    gateErrEl().textContent = "";
     input.focus();
     const submit = () => {
       btn.removeEventListener("click", submit);
@@ -1233,6 +1258,9 @@ function askPassword() {
   });
 }
 const gateErrEl = () => document.getElementById("gateErr");
+// сообщение об ошибке убирается, когда пользователь начал вводить заново
+// (раньше его стирали сразу — «Неверный пароль» никто не успевал увидеть)
+document.getElementById("pw").addEventListener("input", () => { gateErrEl().textContent = ""; });
 
 document.getElementById("q").addEventListener("input", e => {
   state.q = e.target.value.trim(); renderList(true);
